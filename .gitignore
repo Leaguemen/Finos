@@ -1,0 +1,43 @@
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Go backend build and test output
+/backend/bin/
+/backend/tmp/
+/backend/api
+/backend/finos-api
+/backend/coverage.out
+*.test
+
+# Next.js frontend generated output
+/nextjs-dashboard/node_modules/
+/nextjs-dashboard/.next/
+/nextjs-dashboard/out/
+/nextjs-dashboard/build/
+/nextjs-dashboard/coverage/
+/nextjs-dashboard/.vercel/
+/nextjs-dashboard/.turbo/
+/nextjs-dashboard/*.tsbuildinfo
+/nextjs-dashboard/next-env.d.ts
+
+# Package-manager caches

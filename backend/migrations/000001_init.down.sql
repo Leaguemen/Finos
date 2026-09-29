@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS reimbursements;
+DROP TABLE IF EXISTS timesheets;
+DROP TABLE IF EXISTS users;
