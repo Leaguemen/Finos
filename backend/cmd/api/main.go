@@ -10,9 +10,11 @@ import (
 	"syscall"
 	"time"
 
+	"finos.com/api/internal/auth"
 	"finos.com/api/internal/config"
 	"finos.com/api/internal/database"
 	"finos.com/api/internal/server"
+	"finos.com/api/internal/user"
 )
 
 func main() {
@@ -34,9 +36,18 @@ func main() {
 	}
 	defer databasePool.Close()
 
+	tokenManager, err := auth.NewTokenManager(cfg.JWTSecret, cfg.JWTTTL)
+	if err != nil {
+		log.Fatalf("configure JWT manager: %v", err)
+	}
+
+	userRepository := user.NewRepository(databasePool)
+	userService := user.NewService(userRepository)
+	userHandler := user.NewHandler(userService, tokenManager)
+
 	httpServer := &http.Server{
 		Addr:              ":" + cfg.HTTPPort,
-		Handler:           server.New(databasePool),
+		Handler:           server.New(databasePool, userHandler),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,

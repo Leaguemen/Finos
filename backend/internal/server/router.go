@@ -2,17 +2,19 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"time"
 
+	"finos.com/api/internal/helper"
+	"finos.com/api/internal/user"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func New(database *pgxpool.Pool) http.Handler {
+func New(database *pgxpool.Pool, userHandler *user.Handler) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /health", healthHandler(database))
+	mux.HandleFunc("POST /api/v1/auth/register", userHandler.Register)
 
 	return requestLogger(mux)
 }
@@ -23,26 +25,16 @@ func healthHandler(database *pgxpool.Pool) http.HandlerFunc {
 		defer cancel()
 
 		if err := database.Ping(ctx); err != nil {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+			helper.WriteJSON(w, http.StatusServiceUnavailable, map[string]string{
 				"status":   "error",
 				"database": "unavailable",
 			})
 			return
 		}
 
-		writeJSON(w, http.StatusOK, map[string]string{
+		helper.WriteJSON(w, http.StatusOK, map[string]string{
 			"status":   "ok",
 			"database": "connected",
 		})
-	}
-}
-
-func writeJSON(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-
-	if err := json.NewEncoder(w).Encode(value); err != nil {
-
-		return
 	}
 }

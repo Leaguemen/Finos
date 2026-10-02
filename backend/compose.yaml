@@ -6,9 +6,11 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      APP_ENV: development
-      HTTP_PORT: 8080
-      DATABASE_URL: postgres://finos:finos_password@db:5432/finos?sslmode=disable
+      APP_ENV: ${APP_ENV:-development}
+      HTTP_PORT: ${HTTP_PORT:-8080}
+      DATABASE_URL: ${DATABASE_URL:-postgres://finos:finos_password@db:5432/finos?sslmode=disable\}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      JWT_TTL: ${JWT_TTL:-8h}
     ports:
       - "8080:8080"
     depends_on:
@@ -28,7 +30,7 @@ services:
       POSTGRES_USER: finos
       POSTGRES_PASSWORD: finos_password
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
