@@ -128,3 +128,65 @@ form .finos-button { width: 100%; margin-top: 29px; }
   .form-panel { padding-left: 65px; padding-right: 65px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+
+/* Shared workspace navigation, collection controls, and timesheet surfaces. */
+.workspace-nav { display: flex; gap: 24px; padding: 0 24px; background: white; border-bottom: 1px solid var(--line); }
+.workspace-nav a { display: flex; align-items: center; gap: 8px; padding: 18px 0; font-size: 13px; color: var(--muted); border-bottom: 2px solid transparent; }
+.workspace-nav a[aria-current] { color: var(--ink); border-color: var(--gold); font-weight: 600; }
+.workspace-nav svg, .back-link svg { width: 18px; height: 18px; flex-shrink: 0; }
+.timesheet-panel, .timesheet-form { background: white; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.collection-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 20px; border-bottom: 1px solid var(--line); }
+.collection-controls label { min-width: 0; font-size: 12px; font-weight: 600; display: flex; flex-direction: column; gap: 8px; }
+.collection-controls .search-control { grid-column: 1 / -1; }
+.collection-controls input, .collection-controls select, .field textarea { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--line); border-radius: 6px; background-color: white; color: var(--ink); padding: 10px; font-size: 16px; font-weight: 400; }
+.collection-controls input:focus, .collection-controls select:focus, .field textarea:focus { outline: 2px solid var(--gold); outline-offset: 2px; box-shadow: none; }
+.reset-filters { align-self: end; min-height: 44px; text-align: left; font-size: 12px; color: var(--gold-dark); text-decoration: underline; text-underline-offset: 3px; }
+.list-summary { display: flex; justify-content: space-between; gap: 12px; padding: 18px 20px; font-size: 12px; color: var(--muted); }
+.list-summary strong { font-weight: 600; color: var(--ink); }
+.list-state { padding: 52px 24px; display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center; font-size: 14px; color: var(--muted); }
+.list-state > svg { height: 34px; width: 34px; color: var(--gold-dark); }
+.list-state h2 { font-size: 22px; font-weight: 600; color: var(--ink); }
+.timesheet-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.timesheet-table thead { display: none; }
+.timesheet-table tr { display: block; border-top: 1px solid var(--line); padding: 14px 20px; }
+.timesheet-table td { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 8px 0; }
+.timesheet-table td::before { content: attr(data-label); color: var(--muted); font-size: 11px; flex-shrink: 0; }
+.description-cell { white-space: pre-wrap; overflow-wrap: anywhere; }
+.muted { color: var(--muted); font-weight: 400; }
+.status-pill { border-radius: 24px; padding: 5px 9px; font-size: 11px; text-transform: capitalize; background: #eef0f2; color: #555f69; white-space: nowrap; }
+.status-submitted { background: #eaf0fb; color: #375b8b; }
+.status-approved { background: #edf4ed; color: #3c684a; }
+.status-rejected { background: #fff0eb; color: #9b3021; }
+.back-link { display: inline-flex; align-items: center; gap: 9px; min-height: 44px; font-size: 13px; color: var(--gold-dark); }
+.back-link:hover { text-decoration: underline; }
+.create-layout { display: grid; gap: 24px; }
+.timesheet-form { padding: 24px; }
+.field textarea { resize: vertical; min-height: 140px; line-height: 1.7; }
+.form-actions { display: flex; align-items: center; justify-content: space-between; gap: 20px; border-top: 1px solid var(--line); padding-top: 24px; margin-top: 30px; }
+.form-actions .finos-button { width: auto; margin-top: 0; }
+.timesheet-note { padding: 24px; border: 1px solid #e7dfc7; border-radius: 12px; background: #f4f1e8; align-self: start; }
+.timesheet-note h2 { font-size: 26px; font-weight: 600; letter-spacing: -.8px; line-height: 1.2; margin: 16px 0; }
+.timesheet-note > p:not(.eyebrow) { font-size: 13px; color: var(--muted); line-height: 1.8; margin-top: 16px; }
+.reimbursement-placeholder { padding-bottom: 32px; }
+.reimbursement-placeholder .back-link { margin-top: 24px; }
+@media (min-width: 768px) {
+  .workspace-nav { padding: 0 48px; }
+  .collection-controls { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .collection-controls .search-control { grid-column: auto; }
+  .timesheet-table thead { display: table-header-group; background: #f8f9fa; }
+  .timesheet-table tr { display: table-row; padding: 0; }
+  .timesheet-table th { text-align: left; color: var(--muted); font-size: 11px; font-weight: 600; padding: 14px 20px; }
+  .timesheet-table td { display: table-cell; padding: 20px; vertical-align: top; }
+  .timesheet-table td::before { display: none; }
+  .timesheet-table td:first-child { width: 150px; white-space: nowrap; }
+  .timesheet-table .description-cell { max-width: 400px; }
+  .create-layout { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .timesheet-form { padding: 32px; }
+}
+@media (max-width: 767px) {
+  .collection-controls label:has(select) { grid-column: 1 / -1; }
+}
+@media (max-width: 380px) {
+  .collection-controls { grid-template-columns: minmax(0, 1fr); }
+}

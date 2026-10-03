@@ -5,17 +5,33 @@ import (
 	"net/http"
 	"time"
 
+	"finos.com/api/internal/auth"
 	"finos.com/api/internal/helper"
+	"finos.com/api/internal/timesheet"
 	"finos.com/api/internal/user"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func New(database *pgxpool.Pool, userHandler *user.Handler) http.Handler {
+func New(
+	database *pgxpool.Pool,
+	tokenManager *auth.TokenManager,
+	userHandler *user.Handler,
+	timesheetHandler *timesheet.Handler,
+) http.Handler {
 	mux := http.NewServeMux()
+	authenticate := auth.Authenticate(tokenManager)
 
 	mux.HandleFunc("GET /health", healthHandler(database))
 	mux.HandleFunc("POST /api/v1/auth/register", userHandler.Register)
 	mux.HandleFunc("POST /api/v1/auth/login", userHandler.Login)
+	mux.Handle(
+		"POST /api/v1/timesheets",
+		authenticate(http.HandlerFunc(timesheetHandler.Create)),
+	)
+	mux.Handle(
+		"GET /api/v1/timesheets",
+		authenticate(http.HandlerFunc(timesheetHandler.GetAll)),
+	)
 
 	return requestLogger(mux)
 }

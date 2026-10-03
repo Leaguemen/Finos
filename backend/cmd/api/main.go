@@ -14,6 +14,7 @@ import (
 	"finos.com/api/internal/config"
 	"finos.com/api/internal/database"
 	"finos.com/api/internal/server"
+	"finos.com/api/internal/timesheet"
 	"finos.com/api/internal/user"
 )
 
@@ -44,10 +45,18 @@ func main() {
 	userRepository := user.NewRepository(databasePool)
 	userService := user.NewService(userRepository)
 	userHandler := user.NewHandler(userService, tokenManager)
+	timesheetRepository := timesheet.NewRepository(databasePool)
+	timesheetService := timesheet.NewService(timesheetRepository)
+	timesheetHandler := timesheet.NewHandler(timesheetService)
 
 	httpServer := &http.Server{
-		Addr:              ":" + cfg.HTTPPort,
-		Handler:           server.New(databasePool, userHandler),
+		Addr: ":" + cfg.HTTPPort,
+		Handler: server.New(
+			databasePool,
+			tokenManager,
+			userHandler,
+			timesheetHandler,
+		),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,

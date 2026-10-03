@@ -147,6 +147,7 @@ func (handler *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	loggedInUser, err := handler.service.Login(r.Context(), input)
 	if err != nil {
 		handler.writeLoginError(w, err)
+		return
 	}
 	accessToken, expiresAt, err := handler.tokenManager.Generate(
 		loggedInUser.ID,

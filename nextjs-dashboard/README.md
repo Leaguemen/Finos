@@ -14,7 +14,10 @@ Open http://localhost:3000. Start the Go API on port 8080. To use another API or
 ## Pages and reusable pieces
 
 - `/login` and `/register`: shared `AuthShell`, `AuthForm`, `Field`, `Button`, and `Brand` components in `app/components`.
-- `/dashboard`: a basic signed-in workspace with logout; `/` routes here.
+- `/dashboard`: your timesheets, with description search, status/date filters, date/hour sorting, and totals for visible rows; `/` routes here.
+- `/timesheets/new`: create a draft timesheet with a work date, 1–24 whole hours, and an optional description.
+- `/reimbursements`: a placeholder reached through shared workspace navigation.
+- `WorkspaceShell`, `CollectionControls`, and `app/lib/collection.ts`: reusable navigation, filter controls, and typed filtering/sorting.
 - `app/ui/global.css`: shared gold, charcoal, gray, and white design tokens inspired by the supplied company-profile PDF.
 - `app/lib/auth.ts`: typed API contract, session storage, and `bearerHeaders()` for future authenticated requests.
 - `AuthProvider` / `AuthGate`: browser-session initialization, guest/protected page redirects, expiration, and tab synchronization.
@@ -30,4 +33,5 @@ pnpm exec tsc --noEmit
 pnpm build
 ```
 
-Backend observation: `internal/user/handler.go` currently lacks `return` after `handler.writeLoginError(w, err)` in `Login`. Add it in the backend so failed logins stop before token generation and return one JSON error. The frontend treats malformed error responses as failed logins.
+
+Timesheets use the same-origin `GET /api/timesheets` and `POST /api/timesheets` bridge to the Go API. Both forward the current bearer token, bypass caching, and handle backend errors. A 401 clears the browser session. The list expects `{ timesheets: [...] }`; creation sends `{ work_date, hours_worked, description }`. Filtering and sorting happen locally over the current user’s returned records. Saving returns to the list and fetches it again. Edit, delete, submission, and reimbursement APIs are not implemented.
