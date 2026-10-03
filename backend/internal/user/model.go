@@ -32,6 +32,11 @@ type RegisterInput struct {
 	Password string `json:"password"`
 }
 
+type LoginInput struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 type Response struct {
 	ID    int64  `json:"id"`
 	Name  string `json:"name"`

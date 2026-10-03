@@ -18,11 +18,13 @@ const (
 )
 
 var (
-	ErrNameRequired     = errors.New("name is required")
-	ErrNameTooLong      = errors.New("name must not exceed 255 characters")
-	ErrInvalidEmail     = errors.New("email is invalid")
-	ErrPasswordTooShort = errors.New("password must contain at least 8 bytes")
-	ErrPasswordTooLong  = errors.New("password must not exceed 72 bytes")
+	ErrNameRequired       = errors.New("name is required")
+	ErrNameTooLong        = errors.New("name must not exceed 255 characters")
+	ErrInvalidEmail       = errors.New("email is invalid")
+	ErrPasswordTooShort   = errors.New("password must contain at least 8 bytes")
+	ErrPasswordTooLong    = errors.New("password must not exceed 72 bytes")
+	ErrNotFoundUser       = errors.New("User not found")
+	ErrInvalidCredentials = errors.New("invalid email or password")
 )
 
 type UserService struct {
@@ -82,5 +84,31 @@ func (service *UserService) Register(
 		Name:  createdUser.Name,
 		Email: createdUser.Email,
 		Role:  createdUser.Role,
+	}, nil
+}
+
+func (service *UserService) Login(
+	ctx context.Context,
+	input LoginInput,
+) (Response, error) {
+	email := normalizeEmail(input.Email)
+	foundUser, err := service.repository.FindByEmail(ctx, email)
+	if err != nil {
+		return Response{}, ErrNotFoundUser
+	}
+
+	err = bcrypt.CompareHashAndPassword(
+		[]byte(foundUser.PasswordHash),
+		[]byte(input.Password),
+	) 
+	if err != nil {
+		return Response{}, ErrInvalidCredentials
+	}
+
+	return Response{
+		ID:    foundUser.ID,
+		Name:  foundUser.Name,
+		Email: foundUser.Email,
+		Role:  foundUser.Role,
 	}, nil
 }

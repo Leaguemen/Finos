@@ -15,6 +15,7 @@ func New(database *pgxpool.Pool, userHandler *user.Handler) http.Handler {
 
 	mux.HandleFunc("GET /health", healthHandler(database))
 	mux.HandleFunc("POST /api/v1/auth/register", userHandler.Register)
+	mux.HandleFunc("POST /api/v1/auth/login", userHandler.Login)
 
 	return requestLogger(mux)
 }
