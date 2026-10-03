@@ -1,14 +1,10 @@
-import "@/app/ui/global.css";
-import { inter } from "./ui/fonts";
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <html lang="en">
-      <body className={`${inter.className} antialiased`}>{children}</body>
-    </html>
-  );
+import '@/app/ui/global.css';
+import type { Metadata } from 'next';
+import { AuthProvider } from '@/app/components/auth-provider';
+export const metadata: Metadata = {
+  title: { default: 'Finos', template: '%s | Finos' },
+  description: 'Your work, beautifully organized. Welcome to Finos.',
+};
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return <html lang="en"><body><AuthProvider>{children}</AuthProvider></body></html>;
 }
