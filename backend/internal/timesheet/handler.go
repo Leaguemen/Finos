@@ -8,6 +8,7 @@ import (
 	"log"
 	"mime"
 	"net/http"
+	"strconv"
 
 	"finos.com/api/internal/auth"
 	"finos.com/api/internal/helper"
@@ -17,7 +18,8 @@ const maximumCreateBodyBytes = 64 << 10
 
 type TimesheetService interface {
 	Create(ctx context.Context, userID int64, input CreateInput) (Response, error)
-	GetAll(ctx context.Context, userID int64) ([]Response, error)
+	GetAll(ctx context.Context, userID int64, userRole string) ([]Response, error)
+	ApproveTimesheet(ctx context.Context, timesheetID int64, userRole string) (Response, error)
 }
 
 type Handler struct {
@@ -88,7 +90,7 @@ func (handler *Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	timesheets, err := handler.service.GetAll(r.Context(), principal.UserID)
+	timesheets, err := handler.service.GetAll(r.Context(), principal.UserID, principal.Role)
 	if err != nil {
 		if errors.Is(err, ErrInvalidUserID) {
 			writeError(w, http.StatusUnauthorized, "unauthorized", "Authentication is required")
@@ -101,6 +103,35 @@ func (handler *Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	helper.WriteJSON(w, http.StatusOK, listResponse{Timesheets: timesheets})
+}
+
+func (handler *Handler) ApproveTimesheet(w http.ResponseWriter, r *http.Request) {
+	principal, ok := auth.PrincipalFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Authentication is required")
+		return
+	}
+	timesheetID, err := strconv.ParseInt(r.PathValue("timesheetID"), 10, 64)
+	if err != nil || timesheetID <= 0 {
+		writeError(w, http.StatusBadRequest, "validation_error", "Timesheet ID must be a positive integer")
+		return
+	}
+
+	timesheet, err := handler.service.ApproveTimesheet(r.Context(), timesheetID, principal.Role)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrNotManager):
+			writeError(w, http.StatusForbidden, "forbidden", "Only managers can approve timesheets")
+		case errors.Is(err, ErrTimesheetNotFound):
+			writeError(w, http.StatusNotFound, "not_found", "Timesheet not found")
+		default:
+			log.Printf("approve timesheet: %v", err)
+			writeError(w, http.StatusInternalServerError, "internal_error", "Internal server error")
+		}
+		return
+	}
+
+	helper.WriteJSON(w, http.StatusOK, timesheet)
 }
 
 func writeError(w http.ResponseWriter, status int, code, message string) {

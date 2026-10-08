@@ -20,14 +20,17 @@ type Repository interface {
 	Create(ctx context.Context, params CreateParams) (User, error)
 	FindByEmail(ctx context.Context, email string) (User, error)
 	FindByID(ctx context.Context, id int64) (User, error)
+	PromoteToManager(ctx context.Context, id int64) (User, error)
+	List(ctx context.Context) ([]Summary, error)
 }
 
-type queryRower interface {
+type database interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 }
 
 type PostgresRepository struct {
-	database queryRower
+	database database
 }
 
 func NewRepository(pool *pgxpool.Pool) *PostgresRepository {
@@ -113,6 +116,53 @@ func (repository *PostgresRepository) FindByID(
 	}
 
 	return foundUser, nil
+}
+
+func (repository *PostgresRepository) PromoteToManager(ctx context.Context, id int64) (User, error) {
+	const query = `
+		UPDATE users
+		SET role = $2, updated_at = NOW()
+		WHERE id = $1
+		RETURNING id, name, email, password_hash, role, created_at, updated_at
+	`
+
+	promotedUser, err := scanUser(repository.database.QueryRow(ctx, query, id, RoleManager))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return User{}, ErrNotFound
+	}
+	if err != nil {
+		return User{}, fmt.Errorf("promote user to manager: %w", err)
+	}
+
+	return promotedUser, nil
+}
+
+func (repository *PostgresRepository) List(ctx context.Context) ([]Summary, error) {
+	const query = `
+		SELECT id, name
+		FROM users
+		ORDER BY name ASC, id ASC
+	`
+
+	rows, err := repository.database.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("list users: %w", err)
+	}
+	defer rows.Close()
+
+	users := make([]Summary, 0)
+	for rows.Next() {
+		var foundUser Summary
+		if err := rows.Scan(&foundUser.ID, &foundUser.Name); err != nil {
+			return nil, fmt.Errorf("scan user summary: %w", err)
+		}
+		users = append(users, foundUser)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate users: %w", err)
+	}
+
+	return users, nil
 }
 
 func scanUser(row pgx.Row) (User, error) {

@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      APP_ENV: ${APP_ENV:-development}
+      APP_ENV: development
       HTTP_PORT: ${HTTP_PORT:-8080}
       DATABASE_URL: ${DATABASE_URL:-postgres://finos:finos_password@db:5432/finos?sslmode=disable\}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}

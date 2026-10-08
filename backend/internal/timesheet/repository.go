@@ -11,6 +11,8 @@ import (
 type Repository interface {
 	Create(ctx context.Context, params CreateTimesheetParams) (Timesheet, error)
 	FindAllByUserID(ctx context.Context, userID int64) ([]Timesheet, error)
+	GetAllTimesheet(ctx context.Context) ([]Timesheet, error)
+	ApproveTimesheet(ctx context.Context, timesheetID int64) (Timesheet, error)
 }
 
 type database interface {
@@ -85,6 +87,62 @@ func (repository *PostgresRepository) FindAllByUserID(
 	}
 
 	return timesheets, nil
+}
+
+func (repository *PostgresRepository) GetAllTimesheet(
+	ctx context.Context,
+) ([]Timesheet, error) {
+	const query = `
+		SELECT id, user_id, work_date, hours_worked, description, status, created_at, updated_at
+		FROM timesheets
+		ORDER BY work_date DESC, id DESC
+	`
+	rows, err := repository.database.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("query timesheets: %w", err)
+	}
+	defer rows.Close()
+
+	timesheets := make([]Timesheet, 0)
+	for rows.Next() {
+		timesheet, err := scanTimesheet(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan timesheet: %w", err)
+		}
+		timesheets = append(timesheets, timesheet)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate timesheets: %w", err)
+	}
+
+	return timesheets, nil
+}
+
+// ApproveTimesheet toggles approved timesheets back to draft and approves all other statuses.
+func (repository *PostgresRepository) ApproveTimesheet(
+	ctx context.Context,
+	timesheetID int64,
+) (Timesheet, error) {
+	const query = `
+		UPDATE timesheets
+		SET status = CASE WHEN status = $2 THEN $3 ELSE $2 END,
+		    updated_at = NOW()
+		WHERE id = $1
+		RETURNING id, user_id, work_date, hours_worked, description, status, created_at, updated_at
+	`
+
+	approvedTimesheet, err := scanTimesheet(repository.database.QueryRow(
+		ctx,
+		query,
+		timesheetID,
+		StatusApproved,
+		StatusDraft,
+	))
+	if err != nil {
+		return Timesheet{}, fmt.Errorf("approve timesheet: %w", err)
+	}
+
+	return approvedTimesheet, nil
 }
 
 type rowScanner interface {

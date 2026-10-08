@@ -43,3 +43,8 @@ type Response struct {
 	Email string `json:"email"`
 	Role  Role   `json:"role"`
 }
+
+type Summary struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}

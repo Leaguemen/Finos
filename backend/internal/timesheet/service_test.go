@@ -8,13 +8,15 @@ import (
 )
 
 type stubRepository struct {
-	params     CreateTimesheetParams
-	result     Timesheet
-	listResult []Timesheet
-	err        error
-	called     bool
-	listUserID int64
-	listCalled bool
+	params        CreateTimesheetParams
+	result        Timesheet
+	listResult    []Timesheet
+	err           error
+	called        bool
+	listUserID    int64
+	listCalled    bool
+	approveCalled bool
+	approvedID    int64
 }
 
 func (repository *stubRepository) Create(
@@ -33,6 +35,17 @@ func (repository *stubRepository) FindAllByUserID(
 	repository.listCalled = true
 	repository.listUserID = userID
 	return repository.listResult, repository.err
+}
+
+func (repository *stubRepository) GetAllTimesheet(_ context.Context) ([]Timesheet, error) {
+	repository.listCalled = true
+	return repository.listResult, repository.err
+}
+
+func (repository *stubRepository) ApproveTimesheet(_ context.Context, timesheetID int64) (Timesheet, error) {
+	repository.approveCalled = true
+	repository.approvedID = timesheetID
+	return repository.result, repository.err
 }
 
 func TestServiceCreateUsesAuthenticatedUserAndDraftStatus(t *testing.T) {
@@ -138,7 +151,7 @@ func TestServiceGetAllFiltersByAuthenticatedUser(t *testing.T) {
 	}
 	service := NewService(repository)
 
-	responses, err := service.GetAll(context.Background(), 42)
+	responses, err := service.GetAll(context.Background(), 42, "employee")
 	if err != nil {
 		t.Fatalf("GetAll() error = %v", err)
 	}
@@ -154,7 +167,7 @@ func TestServiceGetAllReturnsEmptyArray(t *testing.T) {
 	repository := &stubRepository{listResult: nil}
 	service := NewService(repository)
 
-	responses, err := service.GetAll(context.Background(), 42)
+	responses, err := service.GetAll(context.Background(), 42, "employee")
 	if err != nil {
 		t.Fatalf("GetAll() error = %v", err)
 	}

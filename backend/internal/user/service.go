@@ -25,6 +25,8 @@ var (
 	ErrPasswordTooLong    = errors.New("password must not exceed 72 bytes")
 	ErrNotFoundUser       = errors.New("User not found")
 	ErrInvalidCredentials = errors.New("invalid email or password")
+	ErrNotManager         = errors.New("manager access is required")
+	ErrInvalidUserID      = errors.New("user ID must be a positive integer")
 )
 
 type UserService struct {
@@ -87,6 +89,46 @@ func (service *UserService) Register(
 	}, nil
 }
 
+func (service *UserService) PromoteToManager(
+	ctx context.Context,
+	userID int64,
+	userRole string,
+) (Response, error) {
+	if userRole != string(RoleManager) {
+		return Response{}, ErrNotManager
+	}
+	if userID <= 0 {
+		return Response{}, ErrInvalidUserID
+	}
+
+	promotedUser, err := service.repository.PromoteToManager(ctx, userID)
+	if err != nil {
+		return Response{}, fmt.Errorf("promote user to manager: %w", err)
+	}
+
+	return Response{
+		ID:    promotedUser.ID,
+		Name:  promotedUser.Name,
+		Email: promotedUser.Email,
+		Role:  promotedUser.Role,
+	}, nil
+}
+
+func (service *UserService) List(ctx context.Context, userRole string) ([]Summary, error) {
+	if userRole != string(RoleManager) {
+		return nil, ErrNotManager
+	}
+
+	users, err := service.repository.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list users: %w", err)
+	}
+	if users == nil {
+		users = make([]Summary, 0)
+	}
+	return users, nil
+}
+
 func (service *UserService) Login(
 	ctx context.Context,
 	input LoginInput,
@@ -100,7 +142,7 @@ func (service *UserService) Login(
 	err = bcrypt.CompareHashAndPassword(
 		[]byte(foundUser.PasswordHash),
 		[]byte(input.Password),
-	) 
+	)
 	if err != nil {
 		return Response{}, ErrInvalidCredentials
 	}

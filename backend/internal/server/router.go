@@ -25,12 +25,24 @@ func New(
 	mux.HandleFunc("POST /api/v1/auth/register", userHandler.Register)
 	mux.HandleFunc("POST /api/v1/auth/login", userHandler.Login)
 	mux.Handle(
+		"GET /api/v1/users",
+		authenticate(http.HandlerFunc(userHandler.List)),
+	)
+	mux.Handle(
+		"PATCH /api/v1/users/{userID}/promote",
+		authenticate(http.HandlerFunc(userHandler.PromoteToManager)),
+	)
+	mux.Handle(
 		"POST /api/v1/timesheets",
 		authenticate(http.HandlerFunc(timesheetHandler.Create)),
 	)
 	mux.Handle(
 		"GET /api/v1/timesheets",
 		authenticate(http.HandlerFunc(timesheetHandler.GetAll)),
+	)
+	mux.Handle(
+		"PATCH /api/v1/timesheets/{timesheetID}/approve",
+		authenticate(http.HandlerFunc(timesheetHandler.ApproveTimesheet)),
 	)
 
 	return requestLogger(mux)

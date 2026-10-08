@@ -2,6 +2,16 @@ export type User = { id: number; name: string; email: string; role: string };
 export type AuthResponse = { access_token: string; token_type: string; expires_in: number; user: User };
 export type Session = { token: string; expiresAt: number; user?: User };
 export const SESSION_KEY = 'finos.session';
+
+// Decode only for UI visibility. The API verifies the signature and permissions.
+export function getTokenRole(token?: string): string | null {
+  try {
+    if (!token || token.split('.').length !== 3) return null;
+    const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const claims = JSON.parse(atob(payload.padEnd(Math.ceil(payload.length / 4) * 4, '=')));
+    return typeof claims?.role === 'string' ? claims.role : null;
+  } catch { return null; }
+}
 export function readSession(): Session | null {
   try {
     const value = localStorage.getItem(SESSION_KEY);

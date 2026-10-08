@@ -6,14 +6,18 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 const dateLayout = "2006-01-02"
 
 var (
-	ErrInvalidUserID = errors.New("authenticated user is required")
-	ErrInvalidDate   = errors.New("work_date must use YYYY-MM-DD format")
-	ErrInvalidHours  = errors.New("hours_worked must be between 1 and 24")
+	ErrInvalidUserID     = errors.New("authenticated user is required")
+	ErrInvalidDate       = errors.New("work_date must use YYYY-MM-DD format")
+	ErrInvalidHours      = errors.New("hours_worked must be between 1 and 24")
+	ErrNotManager        = errors.New("You are not a manager, go away")
+	ErrTimesheetNotFound = errors.New("timesheet not found")
 )
 
 type Service struct {
@@ -59,12 +63,18 @@ func (service *Service) Create(
 func (service *Service) GetAll(
 	ctx context.Context,
 	userID int64,
+	userRole string,
 ) ([]Response, error) {
 	if userID <= 0 {
 		return nil, ErrInvalidUserID
 	}
-
-	foundTimesheets, err := service.repository.FindAllByUserID(ctx, userID)
+	var foundTimesheets []Timesheet
+	var err error
+	if userRole == "manager" {
+		foundTimesheets, err = service.repository.GetAllTimesheet(ctx)
+	} else {
+		foundTimesheets, err = service.repository.FindAllByUserID(ctx, userID)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("get user timesheets: %w", err)
 	}
@@ -75,6 +85,24 @@ func (service *Service) GetAll(
 	}
 
 	return responses, nil
+}
+
+func (service *Service) ApproveTimesheet(
+	ctx context.Context,
+	timesheetID int64,
+	userRole string,
+) (Response, error) {
+	if userRole != "manager" {
+		return Response{}, ErrNotManager
+	}
+	approvedTimesheet, err := service.repository.ApproveTimesheet(ctx, timesheetID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Response{}, ErrTimesheetNotFound
+	}
+	if err != nil {
+		return Response{}, fmt.Errorf("approve timesheet: %w", err)
+	}
+	return toResponse(approvedTimesheet), nil
 }
 
 func normalizeDescription(description *string) *string {

@@ -22,6 +22,10 @@ type stubCreator struct {
 	listCalled bool
 }
 
+func (creator *stubCreator) ApproveTimesheet(_ context.Context, _ int64, _ string) (Response, error) {
+	panic("unexpected ApproveTimesheet call")
+}
+
 func (creator *stubCreator) Create(
 	_ context.Context,
 	userID int64,
@@ -36,6 +40,7 @@ func (creator *stubCreator) Create(
 func (creator *stubCreator) GetAll(
 	_ context.Context,
 	userID int64,
+	_ string,
 ) ([]Response, error) {
 	creator.listCalled = true
 	creator.userID = userID

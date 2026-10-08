@@ -8,6 +8,7 @@ import (
 	"log"
 	"mime"
 	"net/http"
+	"strconv"
 	"time"
 
 	"finos.com/api/internal/auth"
@@ -19,6 +20,8 @@ const maximumRegistrationBodyBytes = 64 << 10
 type RegistrationService interface {
 	Register(ctx context.Context, input RegisterInput) (Response, error)
 	Login(ctx context.Context, input LoginInput) (Response, error)
+	PromoteToManager(ctx context.Context, userID int64, userRole string) (Response, error)
+	List(ctx context.Context, userRole string) ([]Summary, error)
 }
 
 type Handler struct {
@@ -31,6 +34,10 @@ type RegisterResponse struct {
 	TokenType   string   `json:"token_type"`
 	ExpiresIn   int64    `json:"expires_in"`
 	User        Response `json:"user"`
+}
+
+type listResponse struct {
+	Users []Summary `json:"users"`
 }
 
 type errorBody struct {
@@ -176,6 +183,61 @@ func (handler *Handler) writeLoginError(w http.ResponseWriter, err error) {
 		log.Printf("login user: %v", err)
 		writeError(w, http.StatusInternalServerError, "internal_error", "Internal server error")
 	}
+}
+
+func (handler *Handler) PromoteToManager(w http.ResponseWriter, r *http.Request) {
+	principal, ok := auth.PrincipalFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Authentication is required")
+		return
+	}
+
+	userID, err := strconv.ParseInt(r.PathValue("userID"), 10, 64)
+	if err != nil || userID <= 0 {
+		writeError(w, http.StatusBadRequest, "validation_error", "User ID must be a positive integer")
+		return
+	}
+
+	promotedUser, err := handler.service.PromoteToManager(r.Context(), userID, principal.Role)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrNotManager):
+			writeError(w, http.StatusForbidden, "forbidden", "Only managers can promote users")
+		case errors.Is(err, ErrInvalidUserID):
+			writeError(w, http.StatusBadRequest, "validation_error", err.Error())
+		case errors.Is(err, ErrNotFound):
+			writeError(w, http.StatusNotFound, "not_found", "User not found")
+		default:
+			log.Printf("promote user to manager: %v", err)
+			writeError(w, http.StatusInternalServerError, "internal_error", "Internal server error")
+		}
+		return
+	}
+
+	w.Header().Set("Cache-Control", "no-store")
+	helper.WriteJSON(w, http.StatusOK, promotedUser)
+}
+
+func (handler *Handler) List(w http.ResponseWriter, r *http.Request) {
+	principal, ok := auth.PrincipalFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Authentication is required")
+		return
+	}
+
+	users, err := handler.service.List(r.Context(), principal.Role)
+	if err != nil {
+		if errors.Is(err, ErrNotManager) {
+			writeError(w, http.StatusForbidden, "forbidden", "Only managers can list users")
+			return
+		}
+		log.Printf("list users: %v", err)
+		writeError(w, http.StatusInternalServerError, "internal_error", "Internal server error")
+		return
+	}
+
+	w.Header().Set("Cache-Control", "no-store")
+	helper.WriteJSON(w, http.StatusOK, listResponse{Users: users})
 }
 
 func writeError(w http.ResponseWriter, status int, code, message string) {
