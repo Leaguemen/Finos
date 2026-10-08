@@ -1,11 +1,11 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { PlusIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, ClockIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { WorkspaceShell } from './workspace-shell';
 import { CollectionControls } from './collection-controls';
 import { Button } from './ui';
-import { apiRequest, displayDate, statuses, type Timesheet } from '@/app/lib/timesheets';
+import { apiRequest, displayDate, localToday, statuses, type Timesheet } from '@/app/lib/timesheets';
 import { filterAndSort } from '@/app/lib/collection';
 const sorts = [
   { value: 'date-desc', label: 'Date · newest first' }, { value: 'date-asc', label: 'Date · oldest first' },
@@ -21,6 +21,9 @@ function TimesheetList() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [sort, setSort] = useState('date-desc');
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
+  const exportInProgress = useRef(false);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true); setError('');
@@ -37,9 +40,33 @@ function TimesheetList() {
     row => !from || row.work_date >= from, row => !to || row.work_date <= to,
   ], row => sort.startsWith('hours') ? row.hours_worked : row.work_date, sort.endsWith('asc') ? 'asc' : 'desc');
   const reset = () => { setSearch(''); setStatus(''); setFrom(''); setTo(''); setSort('date-desc'); };
+  async function exportTimesheets() {
+    if (exportInProgress.current || loading || error || invalidRange || !filtered.length) return;
+    exportInProgress.current = true;
+    setExporting(true);
+    setExportError('');
+    try {
+      // Load the Excel writer only when the user requests an export.
+      const { downloadTimesheets } = await import('@/app/lib/timesheet-export');
+      await downloadTimesheets(filtered, localToday());
+    } catch {
+      setExportError('Unable to export your timesheets. Please try again.');
+    } finally {
+      exportInProgress.current = false;
+      setExporting(false);
+    }
+  }
   return <>
     <p className="eyebrow"><span />YOUR WORKSPACE</p>
-    <div className="workspace-title"><div><h1>My timesheets.</h1><p>A little record of the work that moves you forward.</p></div><Link className="finos-button" href="/timesheets/new">New timesheet<PlusIcon /></Link></div>
+    <div className="workspace-title"><div><h1>My timesheets.</h1><p>A little record of the work that moves you forward.</p></div><div className="workspace-actions">
+      <Button type="button" className="button-secondary" onClick={exportTimesheets}
+        disabled={loading || !!error || invalidRange || !filtered.length || exporting}
+        aria-busy={exporting} title="Export all timesheets matching the current search and filters">
+        {exporting ? 'Exporting…' : 'Export to Excel'}<ArrowDownTrayIcon aria-hidden="true" />
+      </Button>
+      <Link className="finos-button" href="/timesheets/new">New timesheet<PlusIcon /></Link>
+    </div></div>
+    {exportError && <p className="form-error" role="alert">{exportError}</p>}
     <section className="timesheet-panel" aria-label="Your timesheets">
       <CollectionControls search={search} onSearch={setSearch} sort={sort} onSort={setSort} options={sorts} onReset={reset}>
         <label>Status<select value={status} onChange={e => setStatus(e.target.value)}><option value="">All statuses</option>{statuses.map(s => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}</select></label>

@@ -41,3 +41,7 @@ pnpm-debug.log*
 /nextjs-dashboard/next-env.d.ts
 
 # Package-manager caches
+
+# Local hosting tutorial
+/backend/HOSTING.local.md
+/nextjs-dashboard/VERCEL.local.md

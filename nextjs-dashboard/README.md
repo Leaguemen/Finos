@@ -15,6 +15,7 @@ Open http://localhost:3000. Start the Go API on port 8080. To use another API or
 
 - `/login` and `/register`: shared `AuthShell`, `AuthForm`, `Field`, `Button`, and `Brand` components in `app/components`.
 - `/dashboard`: your timesheets, with description search, status/date filters, date/hour sorting, and totals for visible rows; `/` routes here.
+- **Export to Excel** on the dashboard downloads all timesheets matching the current search and filters, in the selected sort order, as an `.xlsx` file with work date, description, numeric hours, and status. Clear filters to export all your timesheets.
 - `/timesheets/new`: create a draft timesheet with a work date, 1–24 whole hours, and an optional description.
 - `/reimbursements`: a placeholder reached through shared workspace navigation.
 - `WorkspaceShell`, `CollectionControls`, and `app/lib/collection.ts`: reusable navigation, filter controls, and typed filtering/sorting.

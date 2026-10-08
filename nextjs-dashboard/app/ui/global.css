@@ -65,7 +65,9 @@ form .finos-button { width: 100%; margin-top: 29px; }
 .button-secondary { min-height: 44px; border-color: var(--line); background: white; font-size: 12px; padding: 10px 14px; }
 .button-secondary:hover:not(:disabled) { background: var(--canvas); }
 .workspace-main { width: 100%; max-width: 1080px; margin: 0 auto; padding: 42px 24px; flex: 1; }
-.workspace-title { display: flex; align-items: flex-start; flex-direction: column; gap: 22px; margin: 15px 0 30px; }
+.workspace-title { display: flex; align-items: flex-start; flex-direction: column; flex-wrap: wrap; gap: 22px; margin: 15px 0 30px; }
+.workspace-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.workspace-actions .finos-button { min-height: 52px; }
 .workspace-title h1 { font-size: clamp(30px, 5vw, 42px); font-weight: 700; letter-spacing: -1.6px; overflow-wrap: anywhere; }
 .workspace-title p { margin-top: 12px; font-size: 14px; line-height: 1.7; color: var(--muted); }
 .session-badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; background: #edf4ed; color: #3c684a; font-size: 11px; font-weight: 600; border: 1px solid #d9e6d9; border-radius: 30px; white-space: nowrap; }
