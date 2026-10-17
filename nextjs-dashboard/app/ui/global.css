@@ -192,6 +192,8 @@ form .finos-button { width: 100%; margin-top: 29px; }
   .timesheet-table td::before { display: none; }
   .timesheet-table td:first-child { width: 150px; white-space: nowrap; }
   .timesheet-table .description-cell { max-width: 400px; }
+  .timesheet-table .approval-column { text-align: center; }
+  .timesheet-table .approval-column .approval-action { align-items: center; }
   .create-layout { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
   .timesheet-form { padding: 32px; }

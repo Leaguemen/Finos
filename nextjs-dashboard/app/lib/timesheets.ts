@@ -4,6 +4,7 @@ export type Timesheet = {
   id: number; user_id: number; work_date: string; hours_worked: number;
   description: string | null; status: typeof statuses[number]; created_at: string; updated_at: string;
 };
+export type Employee = { id: number; name: string };
 export type CreateTimesheet = Pick<Timesheet, 'work_date' | 'hours_worked' | 'description'>;
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(path, { ...options, cache: 'no-store', headers: {
