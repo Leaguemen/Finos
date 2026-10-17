@@ -21,6 +21,11 @@ func New(
 	mux := http.NewServeMux()
 	authenticate := auth.Authenticate(tokenManager)
 
+	mux.HandleFunc("GET /docs", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/docs/", http.StatusMovedPermanently)
+	})
+	mux.HandleFunc("GET /docs/", swaggerUIHandler)
+	mux.HandleFunc("GET /openapi.yaml", openAPIHandler)
 	mux.HandleFunc("GET /health", healthHandler(database))
 	mux.HandleFunc("POST /api/v1/auth/register", userHandler.Register)
 	mux.HandleFunc("POST /api/v1/auth/login", userHandler.Login)

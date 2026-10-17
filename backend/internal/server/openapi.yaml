@@ -1,0 +1,554 @@
+openapi: 3.0.3
+info:
+  title: Finos API
+  version: 1.0.0
+  description: |
+    Backend API for Finos authentication, user administration, and timesheets.
+
+    Protected endpoints expect the access token returned by registration or login
+    in the `Authorization: Bearer <token>` header. Manager-only operations use the
+    role stored in the signed JWT.
+servers:
+  - url: /
+    description: Current server
+tags:
+  - name: System
+  - name: Authentication
+  - name: Users
+  - name: Timesheets
+paths:
+  /health:
+    get:
+      tags: [System]
+      operationId: getHealth
+      summary: Check API and database health
+      responses:
+        "200":
+          description: API is healthy and PostgreSQL is reachable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: ok
+                database: connected
+        "503":
+          description: PostgreSQL is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: error
+                database: unavailable
+
+  /api/v1/auth/register:
+    post:
+      tags: [Authentication]
+      operationId: registerUser
+      summary: Register and log in a new employee
+      description: Creates an employee account and immediately returns an access token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+            example:
+              name: Sean Nugroho
+              email: sean@example.com
+              password: strong-password-123
+      responses:
+        "201":
+          description: User registered and authenticated.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          description: The email address is already registered.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: email_taken
+                  message: Email is already registered
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/auth/login:
+    post:
+      tags: [Authentication]
+      operationId: loginUser
+      summary: Log in with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            example:
+              email: sean@example.com
+              password: strong-password-123
+      responses:
+        "201":
+          description: Login succeeded and an access token was issued.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Invalid JSON or invalid credentials.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/users:
+    get:
+      tags: [Users]
+      operationId: listUsers
+      summary: List users
+      description: Manager-only. Returns user identifiers and names without password hashes.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Users ordered by name and ID.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/users/{userID}/promote:
+    patch:
+      tags: [Users]
+      operationId: promoteUser
+      summary: Promote a user to manager
+      description: Manager-only. The request has no body.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+      responses:
+        "200":
+          description: User was promoted to manager.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/timesheets:
+    post:
+      tags: [Timesheets]
+      operationId: createTimesheet
+      summary: Create a timesheet for the authenticated user
+      description: |
+        The user ID is taken from the JWT and cannot be provided in the request.
+        New timesheets always start with `draft` status.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTimesheetRequest"
+            example:
+              work_date: "2026-10-17"
+              hours_worked: 8
+              description: Worked on the Finos API
+      responses:
+        "201":
+          description: Timesheet created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Timesheet"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    get:
+      tags: [Timesheets]
+      operationId: listTimesheets
+      summary: List accessible timesheets
+      description: Employees receive their own timesheets. Managers receive all timesheets.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Timesheets ordered by work date and ID, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TimesheetListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/timesheets/{timesheetID}/approve:
+    patch:
+      tags: [Timesheets]
+      operationId: toggleTimesheetApproval
+      summary: Toggle timesheet approval
+      description: |
+        Manager-only. Changes a non-approved timesheet to `approved`; calling it on an
+        approved timesheet changes its status back to `draft`. The request has no body.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TimesheetID"
+      responses:
+        "200":
+          description: Updated timesheet.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Timesheet"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    UserID:
+      name: userID
+      in: path
+      required: true
+      description: Positive user ID.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+      example: 7
+    TimesheetID:
+      name: timesheetID
+      in: path
+      required: true
+      description: Positive timesheet ID.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+      example: 12
+
+  schemas:
+    Role:
+      type: string
+      enum: [employee, manager]
+
+    TimesheetStatus:
+      type: string
+      enum: [draft, submitted, approved, rejected]
+
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    User:
+      type: object
+      required: [id, name, email, role]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 9
+        name:
+          type: string
+          example: Sean Nugroho
+        email:
+          type: string
+          format: email
+          example: sean@example.com
+        role:
+          $ref: "#/components/schemas/Role"
+
+    UserSummary:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 9
+        name:
+          type: string
+          example: Sean Nugroho
+
+    UserListResponse:
+      type: object
+      required: [users]
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserSummary"
+
+    AuthResponse:
+      type: object
+      required: [access_token, token_type, expires_in, user]
+      properties:
+        access_token:
+          type: string
+          description: Signed JWT access token.
+        token_type:
+          type: string
+          enum: [Bearer]
+        expires_in:
+          type: integer
+          format: int64
+          description: Remaining token lifetime in seconds.
+          example: 28799
+        user:
+          $ref: "#/components/schemas/User"
+
+    CreateTimesheetRequest:
+      type: object
+      additionalProperties: false
+      required: [work_date, hours_worked]
+      properties:
+        work_date:
+          type: string
+          format: date
+          example: "2026-10-17"
+        hours_worked:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 24
+          example: 8
+        description:
+          type: string
+          nullable: true
+          example: Worked on the Finos API
+
+    Timesheet:
+      type: object
+      required:
+        - id
+        - user_id
+        - work_date
+        - hours_worked
+        - description
+        - status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 12
+        user_id:
+          type: integer
+          format: int64
+          example: 9
+        work_date:
+          type: string
+          format: date
+          example: "2026-10-17"
+        hours_worked:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 24
+          example: 8
+        description:
+          type: string
+          nullable: true
+          example: Worked on the Finos API
+        status:
+          $ref: "#/components/schemas/TimesheetStatus"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TimesheetListResponse:
+      type: object
+      required: [timesheets]
+      properties:
+        timesheets:
+          type: array
+          items:
+            $ref: "#/components/schemas/Timesheet"
+
+    HealthResponse:
+      type: object
+      required: [status, database]
+      properties:
+        status:
+          type: string
+          enum: [ok, error]
+        database:
+          type: string
+          enum: [connected, unavailable]
+
+    ErrorBody:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: validation_error
+        message:
+          type: string
+          example: Request validation failed
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          $ref: "#/components/schemas/ErrorBody"
+
+  responses:
+    BadRequest:
+      description: Invalid input or malformed JSON.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: A valid bearer token is required.
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+          example: Bearer
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: unauthorized
+              message: A valid bearer token is required
+    Forbidden:
+      description: The authenticated user does not have the required manager role.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: forbidden
+              message: Manager access is required
+    NotFound:
+      description: The requested resource was not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    UnsupportedMediaType:
+      description: Content-Type must be application/json.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: unsupported_media_type
+              message: Content-Type must be application/json
+    InternalError:
+      description: Unexpected server error.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: internal_error
+              message: Internal server error
