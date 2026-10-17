@@ -25,6 +25,8 @@ func TestOpenAPIDocumentationHandlers(t *testing.T) {
 			"/api/v1/auth/register:",
 			"/api/v1/users/{userID}/promote:",
 			"/api/v1/timesheets/{timesheetID}/approve:",
+			"/api/v1/timesheets/{timesheetID}/reimbursements:",
+			"/api/v1/reimbursements/{reimbursementID}/receipt:",
 			"bearerAuth:",
 		} {
 			if !strings.Contains(recorder.Body.String(), expected) {

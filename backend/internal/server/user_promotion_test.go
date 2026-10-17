@@ -62,7 +62,7 @@ func TestPromoteUserRoute(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repository := &promotionRepository{err: tt.repoErr}
 			handler := user.NewHandler(user.NewService(repository), tokenManager)
-			router := New(nil, tokenManager, handler, nil)
+			router := New(nil, tokenManager, handler, nil, nil)
 			request := httptest.NewRequest(http.MethodPatch, "/api/v1/users/"+tt.id+"/promote", strings.NewReader(tt.body))
 			if tt.role != "" {
 				token, _, err := tokenManager.Generate(99, tt.role)

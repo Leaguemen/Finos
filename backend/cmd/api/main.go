@@ -13,6 +13,7 @@ import (
 	"finos.com/api/internal/auth"
 	"finos.com/api/internal/config"
 	"finos.com/api/internal/database"
+	"finos.com/api/internal/reimbursement"
 	"finos.com/api/internal/server"
 	"finos.com/api/internal/timesheet"
 	"finos.com/api/internal/user"
@@ -48,6 +49,18 @@ func main() {
 	timesheetRepository := timesheet.NewRepository(databasePool)
 	timesheetService := timesheet.NewService(timesheetRepository)
 	timesheetHandler := timesheet.NewHandler(timesheetService)
+	reimbursementRepository := reimbursement.NewRepository(databasePool)
+	receiptStore, err := reimbursement.NewCloudinaryStore(
+		cfg.CloudinaryCloudName,
+		cfg.CloudinaryAPIKey,
+		cfg.CloudinaryAPISecret,
+		cfg.CloudinaryFolder,
+	)
+	if err != nil {
+		log.Fatalf("configure receipt storage: %v", err)
+	}
+	reimbursementService := reimbursement.NewService(reimbursementRepository, receiptStore)
+	reimbursementHandler := reimbursement.NewHandler(reimbursementService)
 
 	httpServer := &http.Server{
 		Addr: ":" + cfg.HTTPPort,
@@ -56,6 +69,7 @@ func main() {
 			tokenManager,
 			userHandler,
 			timesheetHandler,
+			reimbursementHandler,
 		),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,

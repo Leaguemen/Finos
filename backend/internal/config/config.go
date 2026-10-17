@@ -9,11 +9,15 @@ import (
 )
 
 type Config struct {
-	AppEnv      string
-	HTTPPort    string
-	DatabaseURL string
-	JWTSecret   string
-	JWTTTL      time.Duration
+	AppEnv              string
+	HTTPPort            string
+	DatabaseURL         string
+	JWTSecret           string
+	JWTTTL              time.Duration
+	CloudinaryCloudName string
+	CloudinaryAPIKey    string
+	CloudinaryAPISecret string
+	CloudinaryFolder    string
 }
 
 func Load() (Config, error) {
@@ -23,11 +27,15 @@ func Load() (Config, error) {
 	}
 
 	cfg := Config{
-		AppEnv:      getEnv("APP_ENV", "development"),
-		HTTPPort:    getEnv("HTTP_PORT", "8080"),
-		DatabaseURL: strings.TrimSpace(os.Getenv("DATABASE_URL")),
-		JWTSecret:   strings.TrimSpace(os.Getenv("JWT_SECRET")),
-		JWTTTL:      jwtTTL,
+		AppEnv:              getEnv("APP_ENV", "development"),
+		HTTPPort:            getEnv("HTTP_PORT", "8080"),
+		DatabaseURL:         strings.TrimSpace(os.Getenv("DATABASE_URL")),
+		JWTSecret:           strings.TrimSpace(os.Getenv("JWT_SECRET")),
+		JWTTTL:              jwtTTL,
+		CloudinaryCloudName: strings.TrimSpace(os.Getenv("CLOUDINARY_CLOUD_NAME")),
+		CloudinaryAPIKey:    strings.TrimSpace(os.Getenv("CLOUDINARY_API_KEY")),
+		CloudinaryAPISecret: strings.TrimSpace(os.Getenv("CLOUDINARY_API_SECRET")),
+		CloudinaryFolder:    getEnv("CLOUDINARY_FOLDER", "finos/development/receipts"),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -38,6 +46,15 @@ func Load() (Config, error) {
 	}
 	if cfg.JWTTTL <= 0 {
 		return Config{}, fmt.Errorf("JWT_TTL must be greater than zero")
+	}
+	if cfg.CloudinaryCloudName == "" {
+		return Config{}, fmt.Errorf("CLOUDINARY_CLOUD_NAME is required")
+	}
+	if cfg.CloudinaryAPIKey == "" {
+		return Config{}, fmt.Errorf("CLOUDINARY_API_KEY is required")
+	}
+	if cfg.CloudinaryAPISecret == "" {
+		return Config{}, fmt.Errorf("CLOUDINARY_API_SECRET is required")
 	}
 
 	port, err := strconv.Atoi(cfg.HTTPPort)

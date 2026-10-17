@@ -7,6 +7,7 @@ import (
 
 	"finos.com/api/internal/auth"
 	"finos.com/api/internal/helper"
+	"finos.com/api/internal/reimbursement"
 	"finos.com/api/internal/timesheet"
 	"finos.com/api/internal/user"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -17,6 +18,7 @@ func New(
 	tokenManager *auth.TokenManager,
 	userHandler *user.Handler,
 	timesheetHandler *timesheet.Handler,
+	reimbursementHandler *reimbursement.Handler,
 ) http.Handler {
 	mux := http.NewServeMux()
 	authenticate := auth.Authenticate(tokenManager)
@@ -48,6 +50,22 @@ func New(
 	mux.Handle(
 		"PATCH /api/v1/timesheets/{timesheetID}/approve",
 		authenticate(http.HandlerFunc(timesheetHandler.ApproveTimesheet)),
+	)
+	mux.Handle(
+		"POST /api/v1/timesheets/{timesheetID}/reimbursements",
+		authenticate(http.HandlerFunc(reimbursementHandler.Create)),
+	)
+	mux.Handle(
+		"GET /api/v1/timesheets/{timesheetID}/reimbursements",
+		authenticate(http.HandlerFunc(reimbursementHandler.ListByTimesheet)),
+	)
+	mux.Handle(
+		"GET /api/v1/reimbursements/{reimbursementID}",
+		authenticate(http.HandlerFunc(reimbursementHandler.Get)),
+	)
+	mux.Handle(
+		"GET /api/v1/reimbursements/{reimbursementID}/receipt",
+		authenticate(http.HandlerFunc(reimbursementHandler.Receipt)),
 	)
 
 	return requestLogger(mux)

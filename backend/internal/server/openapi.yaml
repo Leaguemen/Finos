@@ -3,7 +3,7 @@ info:
   title: Finos API
   version: 1.0.0
   description: |
-    Backend API for Finos authentication, user administration, and timesheets.
+    Backend API for Finos authentication, user administration, timesheets, and reimbursements.
 
     Protected endpoints expect the access token returned by registration or login
     in the `Authorization: Bearer <token>` header. Manager-only operations use the
@@ -16,6 +16,7 @@ tags:
   - name: Authentication
   - name: Users
   - name: Timesheets
+  - name: Reimbursements
 paths:
   /health:
     get:
@@ -268,6 +269,156 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/v1/timesheets/{timesheetID}/reimbursements:
+    post:
+      tags: [Reimbursements]
+      operationId: createReimbursement
+      summary: Create a reimbursement for a timesheet
+      description: |
+        Creates a draft reimbursement for a timesheet owned by the authenticated user.
+        The user ID and status are derived by the server. A JPEG or PNG receipt of at
+        most 5 MiB may be included.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TimesheetID"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CreateReimbursementRequest"
+      responses:
+        "201":
+          description: Reimbursement created.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reimbursement"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "413":
+          description: Multipart request exceeds 6 MiB.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "415":
+          description: Content-Type must be multipart/form-data.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    get:
+      tags: [Reimbursements]
+      operationId: listTimesheetReimbursements
+      summary: List reimbursements for a timesheet
+      description: Employees may access their own timesheets. Managers may access any timesheet.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TimesheetID"
+      responses:
+        "200":
+          description: Reimbursements ordered by expense date and ID, newest first.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReimbursementListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/reimbursements/{reimbursementID}:
+    get:
+      tags: [Reimbursements]
+      operationId: getReimbursement
+      summary: Get a reimbursement
+      description: Employees may access their own reimbursement. Managers may access any reimbursement.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ReimbursementID"
+      responses:
+        "200":
+          description: Reimbursement details.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reimbursement"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/reimbursements/{reimbursementID}/receipt:
+    get:
+      tags: [Reimbursements]
+      operationId: getReimbursementReceipt
+      summary: Open a reimbursement receipt
+      description: Authorizes access and redirects to a short-lived signed Cloudinary URL.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ReimbursementID"
+      responses:
+        "302":
+          description: Temporary signed receipt location.
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
+                format: uri
+            Cache-Control:
+              schema:
+                type: string
+              example: no-store
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -296,6 +447,16 @@ components:
         format: int64
         minimum: 1
       example: 12
+    ReimbursementID:
+      name: reimbursementID
+      in: path
+      required: true
+      description: Positive reimbursement ID.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+      example: 23
 
   schemas:
     Role:
@@ -464,6 +625,93 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Timesheet"
+
+    ReimbursementStatus:
+      type: string
+      enum: [draft, submitted, approved, rejected]
+
+    CreateReimbursementRequest:
+      type: object
+      additionalProperties: false
+      required: [expense_date, amount, category]
+      properties:
+        expense_date:
+          type: string
+          format: date
+        amount:
+          type: string
+          pattern: "^(0|[1-9][0-9]{0,9})(\\.[0-9]{1,2})?$"
+          example: "125000.00"
+        category:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 1000
+        receipt:
+          type: string
+          format: binary
+
+    Reimbursement:
+      type: object
+      required:
+        - id
+        - user_id
+        - timesheet_id
+        - expense_date
+        - amount
+        - category
+        - status
+        - has_receipt
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+        user_id:
+          type: integer
+          format: int64
+        timesheet_id:
+          type: integer
+          format: int64
+        expense_date:
+          type: string
+          format: date
+        amount:
+          type: string
+          example: "125000.00"
+        category:
+          type: string
+          example: transportation
+        description:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/ReimbursementStatus"
+        has_receipt:
+          type: boolean
+        receipt_url:
+          type: string
+          nullable: true
+          description: Protected Finos endpoint for the receipt, not a permanent Cloudinary URL.
+          example: /api/v1/reimbursements/23/receipt
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ReimbursementListResponse:
+      type: object
+      required: [reimbursements]
+      properties:
+        reimbursements:
+          type: array
+          items:
+            $ref: "#/components/schemas/Reimbursement"
 
     HealthResponse:
       type: object
