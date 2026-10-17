@@ -239,6 +239,33 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/v1/timesheets/options:
+    get:
+      tags: [Timesheets]
+      operationId: listTimesheetOptions
+      summary: List accessible timesheet options
+      description: |
+        Returns only IDs and descriptions. Employees receive their own timesheets;
+        managers receive all timesheets.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The authenticated user's timesheet options.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TimesheetOptionsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /api/v1/timesheets/{timesheetID}/approve:
     patch:
       tags: [Timesheets]
@@ -625,6 +652,28 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Timesheet"
+
+    TimesheetOption:
+      type: object
+      required: [id, description]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 12
+        description:
+          type: string
+          nullable: true
+          example: Worked on the Finos API
+
+    TimesheetOptionsResponse:
+      type: object
+      required: [timesheets]
+      properties:
+        timesheets:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimesheetOption"
 
     ReimbursementStatus:
       type: string

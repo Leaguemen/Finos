@@ -48,6 +48,10 @@ func New(
 		authenticate(http.HandlerFunc(timesheetHandler.GetAll)),
 	)
 	mux.Handle(
+		"GET /api/v1/timesheets/options",
+		authenticate(http.HandlerFunc(timesheetHandler.GetOptions)),
+	)
+	mux.Handle(
 		"PATCH /api/v1/timesheets/{timesheetID}/approve",
 		authenticate(http.HandlerFunc(timesheetHandler.ApproveTimesheet)),
 	)

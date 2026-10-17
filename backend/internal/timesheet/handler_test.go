@@ -47,6 +47,20 @@ func (creator *stubCreator) GetAll(
 	return creator.listResult, nil
 }
 
+func (creator *stubCreator) GetOptions(
+	_ context.Context,
+	userID int64,
+	_ string,
+) ([]Option, error) {
+	creator.listCalled = true
+	creator.userID = userID
+	options := make([]Option, 0, len(creator.listResult))
+	for _, timesheet := range creator.listResult {
+		options = append(options, Option{ID: timesheet.ID, Description: timesheet.Description})
+	}
+	return options, nil
+}
+
 func TestCreateGetsUserIDFromJWT(t *testing.T) {
 	manager, err := auth.NewTokenManager(handlerTestSecret, time.Hour)
 	if err != nil {
@@ -150,5 +164,41 @@ func TestGetAllGetsUserIDFromJWT(t *testing.T) {
 	}
 	if !strings.Contains(recorder.Body.String(), `"timesheets"`) {
 		t.Fatalf("body = %s, want timesheets field", recorder.Body.String())
+	}
+}
+
+func TestGetOptionsGetsUserIDFromJWT(t *testing.T) {
+	manager, err := auth.NewTokenManager(handlerTestSecret, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, _, err := manager.Generate(42, "manager")
+	if err != nil {
+		t.Fatal(err)
+	}
+	description := "October work"
+	creator := &stubCreator{
+		listResult: []Response{{ID: 7, Description: &description}},
+	}
+	handler := NewHandler(creator)
+	protectedHandler := auth.Authenticate(manager)(http.HandlerFunc(handler.GetOptions))
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/timesheets/options", nil)
+	request.Header.Set("Authorization", "Bearer "+token)
+	recorder := httptest.NewRecorder()
+
+	protectedHandler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+	if !creator.listCalled || creator.userID != 42 {
+		t.Fatalf("service user ID = %d, want JWT user ID 42", creator.userID)
+	}
+	if recorder.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("Cache-Control = %q, want no-store", recorder.Header().Get("Cache-Control"))
+	}
+	if !strings.Contains(recorder.Body.String(), `"id":7`) ||
+		!strings.Contains(recorder.Body.String(), `"description":"October work"`) {
+		t.Fatalf("body = %s", recorder.Body.String())
 	}
 }

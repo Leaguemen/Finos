@@ -19,6 +19,7 @@ const maximumCreateBodyBytes = 64 << 10
 type TimesheetService interface {
 	Create(ctx context.Context, userID int64, input CreateInput) (Response, error)
 	GetAll(ctx context.Context, userID int64, userRole string) ([]Response, error)
+	GetOptions(ctx context.Context, userID int64, userRole string) ([]Option, error)
 	ApproveTimesheet(ctx context.Context, timesheetID int64, userRole string) (Response, error)
 }
 
@@ -28,6 +29,10 @@ type Handler struct {
 
 type listResponse struct {
 	Timesheets []Response `json:"timesheets"`
+}
+
+type optionsResponse struct {
+	Timesheets []Option `json:"timesheets"`
 }
 
 func NewHandler(service TimesheetService) *Handler {
@@ -103,6 +108,29 @@ func (handler *Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	helper.WriteJSON(w, http.StatusOK, listResponse{Timesheets: timesheets})
+}
+
+func (handler *Handler) GetOptions(w http.ResponseWriter, r *http.Request) {
+	principal, ok := auth.PrincipalFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Authentication is required")
+		return
+	}
+
+	options, err := handler.service.GetOptions(r.Context(), principal.UserID, principal.Role)
+	if err != nil {
+		if errors.Is(err, ErrInvalidUserID) {
+			writeError(w, http.StatusUnauthorized, "unauthorized", "Authentication is required")
+			return
+		}
+
+		log.Printf("get timesheet options: %v", err)
+		writeError(w, http.StatusInternalServerError, "internal_error", "Internal server error")
+		return
+	}
+
+	w.Header().Set("Cache-Control", "no-store")
+	helper.WriteJSON(w, http.StatusOK, optionsResponse{Timesheets: options})
 }
 
 func (handler *Handler) ApproveTimesheet(w http.ResponseWriter, r *http.Request) {

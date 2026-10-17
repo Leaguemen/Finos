@@ -24,6 +24,7 @@ func TestOpenAPIDocumentationHandlers(t *testing.T) {
 			"openapi: 3.0.3",
 			"/api/v1/auth/register:",
 			"/api/v1/users/{userID}/promote:",
+			"/api/v1/timesheets/options:",
 			"/api/v1/timesheets/{timesheetID}/approve:",
 			"/api/v1/timesheets/{timesheetID}/reimbursements:",
 			"/api/v1/reimbursements/{reimbursementID}/receipt:",

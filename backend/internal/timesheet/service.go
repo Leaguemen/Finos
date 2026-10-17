@@ -87,6 +87,38 @@ func (service *Service) GetAll(
 	return responses, nil
 }
 
+// GetOptions returns timesheets available for selection controls. Employees
+// receive their own timesheets, while managers receive every timesheet.
+func (service *Service) GetOptions(
+	ctx context.Context,
+	userID int64,
+	userRole string,
+) ([]Option, error) {
+	if userID <= 0 {
+		return nil, ErrInvalidUserID
+	}
+
+	var foundTimesheets []Timesheet
+	var err error
+	if userRole == "manager" {
+		foundTimesheets, err = service.repository.GetAllTimesheet(ctx)
+	} else {
+		foundTimesheets, err = service.repository.FindAllByUserID(ctx, userID)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get timesheet options: %w", err)
+	}
+
+	options := make([]Option, 0, len(foundTimesheets))
+	for _, foundTimesheet := range foundTimesheets {
+		options = append(options, Option{
+			ID:          foundTimesheet.ID,
+			Description: foundTimesheet.Description,
+		})
+	}
+	return options, nil
+}
+
 func (service *Service) ApproveTimesheet(
 	ctx context.Context,
 	timesheetID int64,

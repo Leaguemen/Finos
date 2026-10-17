@@ -50,9 +50,9 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .field { margin-bottom: 22px; }
 .field label { display: block; font-weight: 600; font-size: 13px; margin-bottom: 9px; }
 .input-wrap { position: relative; }
-.field input { width: 100%; height: 52px; border: 1px solid var(--line); border-radius: 7px; padding: 0 15px; font-size: 16px; color: var(--ink); background: #fff; transition: border-color .15s, box-shadow .15s; }
+.field input, .field select { width: 100%; height: 52px; border: 1px solid var(--line); border-radius: 7px; padding: 0 15px; font-size: 16px; color: var(--ink); background: #fff; transition: border-color .15s, box-shadow .15s; }
 .field input::placeholder { color: #8a9097; font-size: 14px; }
-.field input:focus { border-color: var(--gold); outline: none; box-shadow: 0 0 0 3px #ca9b221a; }
+.field input:focus, .field select:focus { border-color: var(--gold); outline: none; box-shadow: 0 0 0 3px #ca9b221a; }
 .field .password-input { padding-right: 52px; }
 .password-toggle { position: absolute; right: 5px; top: 4px; height: 44px; width: 44px; border: 0; background: transparent; color: #747c84; display: grid; place-items: center; border-radius: 4px; }
 .password-toggle svg { width: 19px; height: 19px; }
@@ -179,8 +179,27 @@ form .finos-button { width: 100%; margin-top: 29px; }
 .timesheet-note { padding: 24px; border: 1px solid #e7dfc7; border-radius: 12px; background: #f4f1e8; align-self: start; }
 .timesheet-note h2 { font-size: 26px; font-weight: 600; letter-spacing: -.8px; line-height: 1.2; margin: 16px 0; }
 .timesheet-note > p:not(.eyebrow) { font-size: 13px; color: var(--muted); line-height: 1.8; margin-top: 16px; }
-.reimbursement-placeholder { padding-bottom: 32px; }
-.reimbursement-placeholder .back-link { margin-top: 24px; }
+.page-message { margin-bottom: 18px; }
+.inline-message { margin: 0 20px 18px; }
+.category-name, .expense-description { display: block; }
+.category-name { font-size: 13px; font-weight: 650; }
+.expense-description { margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.timesheet-description-cell { max-width: 280px; line-height: 1.55; overflow-wrap: anywhere; }
+.amount-column { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.receipt-button { display: inline-flex; min-height: 38px; padding: 8px 10px; gap: 8px; }
+.receipt-button svg { width: 16px; height: 16px; }
+.reimbursement-form .field select { appearance: auto; }
+.receipt-field > input[type='file'] { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+.receipt-picker { min-height: 88px; display: grid !important; grid-template-columns: auto 1fr; align-items: center; column-gap: 12px; row-gap: 4px; padding: 16px; border: 1px dashed #b8bdc2; border-radius: 8px; background: #fafaf8; cursor: pointer; }
+.receipt-picker:hover { border-color: var(--gold); background: #fbf8ef; }
+.receipt-field > input[type='file']:focus + .receipt-picker { outline: 2px solid var(--gold); outline-offset: 2px; }
+.receipt-picker svg { grid-row: 1 / 3; width: 24px; height: 24px; color: var(--gold-dark); }
+.receipt-picker span { font-size: 13px; font-weight: 600; }
+.receipt-picker small { min-width: 0; overflow: hidden; color: var(--muted); font-size: 11px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.form-info { padding: 12px 0; color: var(--muted); font-size: 13px; }
+.form-empty { padding: 16px; border: 1px solid #e7dfc7; border-radius: 8px; background: #f8f5ed; color: var(--muted); font-size: 13px; }
+.form-empty .back-link { margin-top: 7px; }
+.reimbursement-note { background: #f2f0e9; }
 @media (min-width: 768px) {
   .workspace-nav { padding: 0 48px; }
   .collection-controls { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -194,6 +213,8 @@ form .finos-button { width: 100%; margin-top: 29px; }
   .timesheet-table .description-cell { max-width: 400px; }
   .timesheet-table .approval-column { text-align: center; }
   .timesheet-table .approval-column .approval-action { align-items: center; }
+  .reimbursement-table th.amount-column, .reimbursement-table td.amount-column { text-align: right; }
+  .reimbursement-table td:nth-last-child(2), .reimbursement-table td:last-child { vertical-align: middle; }
   .create-layout { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
   .timesheet-form { padding: 32px; }

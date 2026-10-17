@@ -36,6 +36,10 @@ type CreateInput struct {
 	Description *string `json:"description"`
 }
 
+type Option struct {
+	ID          int64   `json:"id"`
+	Description *string `json:"description"`
+}
 
 type Response struct {
 	ID          int64     `json:"id"`

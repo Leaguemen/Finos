@@ -176,6 +176,57 @@ func TestServiceGetAllReturnsEmptyArray(t *testing.T) {
 	}
 }
 
+func TestServiceGetOptionsEmployeeUsesAuthenticatedUser(t *testing.T) {
+	description := "October work"
+	repository := &stubRepository{
+		listResult: []Timesheet{{ID: 7, UserID: 42, Description: &description}},
+	}
+	service := NewService(repository)
+
+	options, err := service.GetOptions(context.Background(), 42, "employee")
+	if err != nil {
+		t.Fatalf("GetOptions() error = %v", err)
+	}
+	if repository.listUserID != 42 {
+		t.Fatalf("repository user ID = %d, want 42", repository.listUserID)
+	}
+	if len(options) != 1 || options[0].ID != 7 || options[0].Description == nil || *options[0].Description != description {
+		t.Fatalf("options = %+v", options)
+	}
+}
+
+func TestServiceGetOptionsManagerGetsAllTimesheets(t *testing.T) {
+	description := "Employee work"
+	repository := &stubRepository{
+		listResult: []Timesheet{{ID: 7, UserID: 99, Description: &description}},
+	}
+	service := NewService(repository)
+
+	options, err := service.GetOptions(context.Background(), 42, "manager")
+	if err != nil {
+		t.Fatalf("GetOptions() error = %v", err)
+	}
+	if repository.listUserID != 0 {
+		t.Fatalf("manager options were filtered by user ID %d", repository.listUserID)
+	}
+	if len(options) != 1 || options[0].ID != 7 {
+		t.Fatalf("options = %+v", options)
+	}
+}
+
+func TestServiceGetOptionsReturnsEmptyArray(t *testing.T) {
+	repository := &stubRepository{listResult: nil}
+	service := NewService(repository)
+
+	options, err := service.GetOptions(context.Background(), 42, "employee")
+	if err != nil {
+		t.Fatalf("GetOptions() error = %v", err)
+	}
+	if options == nil || len(options) != 0 {
+		t.Fatalf("options = %#v, want empty non-nil slice", options)
+	}
+}
+
 func stringPointer(value string) *string {
 	return &value
 }

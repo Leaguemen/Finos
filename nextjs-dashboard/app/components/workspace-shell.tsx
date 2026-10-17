@@ -13,7 +13,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
     <header className="workspace-header"><Brand /><Button className="button-secondary" onClick={signOut}>Log out<ArrowRightStartOnRectangleIcon /></Button></header>
     <nav className="workspace-nav" aria-label="Workspace">
       <Link href="/dashboard" aria-current={path === '/dashboard' || path.startsWith('/timesheets') ? 'page' : undefined}><ClockIcon />Timesheets</Link>
-      <Link href="/reimbursements" aria-current={path === '/reimbursements' ? 'page' : undefined}><BanknotesIcon />Reimbursements</Link>
+      <Link href="/reimbursements" aria-current={path.startsWith('/reimbursements') ? 'page' : undefined}><BanknotesIcon />Reimbursements</Link>
     </nav>
     <main className="workspace-main">{children}</main>
     <footer className="workspace-footer">© {new Date().getFullYear()} P.T. Doval Sejahtera Investa<span>A little clarity. Every day.</span></footer>
