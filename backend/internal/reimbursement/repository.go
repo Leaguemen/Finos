@@ -17,6 +17,7 @@ type Repository interface {
 	Create(ctx context.Context, params CreateParams) (Reimbursement, error)
 	ListByTimesheet(ctx context.Context, timesheetID int64) ([]Reimbursement, error)
 	FindByID(ctx context.Context, reimbursementID int64) (Reimbursement, error)
+	ToggleApproval(ctx context.Context, reimbursementID int64) (Reimbursement, error)
 }
 
 func (repository *PostgresRepository) TimesheetExists(
@@ -175,6 +176,34 @@ func (repository *PostgresRepository) FindByID(
 		return Reimbursement{}, fmt.Errorf("find reimbursement: %w", err)
 	}
 	return found, nil
+}
+
+// ToggleApproval approves a reimbursement or returns an approved one to draft.
+func (repository *PostgresRepository) ToggleApproval(
+	ctx context.Context,
+	reimbursementID int64,
+) (Reimbursement, error) {
+	const query = `
+		UPDATE reimbursements
+		SET status = CASE WHEN status = $2 THEN $3 ELSE $2 END,
+		    updated_at = NOW()
+		WHERE id = $1
+		RETURNING
+			id, user_id, timesheet_id, expense_date, amount::text, category,
+			description, receipt_public_id, receipt_asset_id, receipt_format,
+			receipt_resource_type, receipt_delivery_type, status, created_at, updated_at
+	`
+
+	updated, err := scanReimbursement(repository.database.QueryRow(
+		ctx, query, reimbursementID, StatusApproved, StatusDraft,
+	))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Reimbursement{}, ErrNotFound
+	}
+	if err != nil {
+		return Reimbursement{}, fmt.Errorf("toggle reimbursement approval: %w", err)
+	}
+	return updated, nil
 }
 
 type rowScanner interface {

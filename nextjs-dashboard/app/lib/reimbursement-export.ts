@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs';
 import type { Reimbursement } from './reimbursements';
 import type { TimesheetOption } from './timesheets';
+import { exportTimestamp } from './export-filename';
 
 export async function createReimbursementWorkbook(
   rows: readonly Reimbursement[],
@@ -36,17 +37,23 @@ export async function createReimbursementWorkbook(
   }
   sheet.getColumn('expenseDate').numFmt = 'dd mmm yyyy';
   sheet.getColumn('timesheet').alignment = { wrapText: true, vertical: 'top' };
-  sheet.getColumn('amount').numFmt = '#,##0.00';
+  sheet.getColumn('amount').numFmt = '"Rp" #,##0';
   sheet.getColumn('description').alignment = { wrapText: true, vertical: 'top' };
   sheet.getRow(1).font = { bold: true };
   sheet.autoFilter = { from: 'A1', to: `${String.fromCharCode(64 + sheet.columnCount)}${rows.length + 1}` };
+  const totalRow = sheet.addRow({ description: 'TOTAL' });
+  totalRow.getCell('amount').value = rows.length ? {
+    formula: `SUM(${sheet.getColumn('amount').letter}2:${sheet.getColumn('amount').letter}${rows.length + 1})`,
+    result: rows.reduce((total, row) => total + Number(row.amount), 0),
+  } : 0;
+  totalRow.font = { bold: true };
+  totalRow.border = { top: { style: 'thin' } };
   const buffer = await workbook.xlsx.writeBuffer();
   return new Blob([new Uint8Array(buffer)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
 
 export async function downloadReimbursements(
   rows: readonly Reimbursement[],
-  date: string,
   employeeName: (userId: number) => string,
   timesheets: ReadonlyMap<number, TimesheetOption>,
   includeEmployee: boolean,
@@ -55,7 +62,7 @@ export async function downloadReimbursements(
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `finos-reimbursements-${date}.xlsx`;
+  link.download = `finos-reimbursements-${exportTimestamp()}.xlsx`;
   document.body.appendChild(link);
   try { link.click(); } finally {
     link.remove();

@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import type { Timesheet } from './timesheets';
+import { exportTimestamp } from './export-filename';
 
 export async function createTimesheetWorkbook(rows: readonly Timesheet[]) {
   const workbook = new ExcelJS.Workbook();
@@ -26,18 +27,25 @@ export async function createTimesheetWorkbook(rows: readonly Timesheet[]) {
   sheet.getColumn('description').alignment = { wrapText: true, vertical: 'top' };
   sheet.getRow(1).font = { bold: true };
   sheet.autoFilter = { from: 'A1', to: `D${rows.length + 1}` };
+  const totalRow = sheet.addRow({ description: 'TOTAL' });
+  totalRow.getCell('hours').value = rows.length ? {
+    formula: `SUM(C2:C${rows.length + 1})`,
+    result: rows.reduce((total, row) => total + row.hours_worked, 0),
+  } : 0;
+  totalRow.font = { bold: true };
+  totalRow.border = { top: { style: 'thin' } };
   const buffer = await workbook.xlsx.writeBuffer();
   return new Blob([new Uint8Array(buffer)], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
 }
 
-export async function downloadTimesheets(rows: readonly Timesheet[], date: string) {
+export async function downloadTimesheets(rows: readonly Timesheet[]) {
   const blob = await createTimesheetWorkbook(rows);
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `finos-timesheets-${date}.xlsx`;
+  link.download = `finos-timesheets-${exportTimestamp()}.xlsx`;
   document.body.appendChild(link);
   try {
     link.click();

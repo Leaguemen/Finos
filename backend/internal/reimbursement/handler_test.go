@@ -3,6 +3,8 @@ package reimbursement
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"image"
 	"image/color"
 	"image/png"
@@ -25,6 +27,8 @@ type stubService struct {
 	url         string
 	called      bool
 	err         error
+	role        string
+	approvalID  int64
 }
 
 func (service *stubService) Create(
@@ -46,6 +50,72 @@ func (service *stubService) ListByTimesheet(context.Context, int64, string, int6
 
 func (service *stubService) Get(context.Context, int64, string, int64) (Response, error) {
 	return service.result, service.err
+}
+
+func (service *stubService) ToggleApproval(_ context.Context, role string, reimbursementID int64) (Response, error) {
+	service.called = true
+	service.role = role
+	service.approvalID = reimbursementID
+	return service.result, service.err
+}
+
+func TestToggleReimbursementApproval(t *testing.T) {
+	tests := []struct {
+		name         string
+		id           string
+		role         string
+		resultStatus Status
+		serviceErr   error
+		wantStatus   int
+		wantCode     string
+		wantCall     bool
+	}{
+		{name: "approve", id: "23", role: "manager", resultStatus: StatusApproved, wantStatus: http.StatusOK, wantCall: true},
+		{name: "unapprove", id: "23", role: "manager", resultStatus: StatusDraft, wantStatus: http.StatusOK, wantCall: true},
+		{name: "unauthenticated", id: "23", wantStatus: http.StatusUnauthorized, wantCode: "unauthorized"},
+		{name: "employee", id: "23", role: "employee", serviceErr: ErrForbidden, wantStatus: http.StatusForbidden, wantCode: "forbidden", wantCall: true},
+		{name: "bad ID", id: "abc", role: "manager", wantStatus: http.StatusBadRequest, wantCode: "validation_error"},
+		{name: "zero ID", id: "0", role: "manager", wantStatus: http.StatusBadRequest, wantCode: "validation_error"},
+		{name: "missing", id: "23", role: "manager", serviceErr: ErrNotFound, wantStatus: http.StatusNotFound, wantCode: "not_found", wantCall: true},
+		{name: "internal", id: "23", role: "manager", serviceErr: errors.New("private database detail"), wantStatus: http.StatusInternalServerError, wantCode: "internal_error", wantCall: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokenManager, _ := reimbursementTestToken(t, 42, "manager")
+			service := &stubService{result: Response{ID: 23, Status: tt.resultStatus}, err: tt.serviceErr}
+			handler := NewHandler(service)
+			mux := http.NewServeMux()
+			mux.Handle("PATCH /api/v1/reimbursements/{reimbursementID}/approve", auth.Authenticate(tokenManager)(http.HandlerFunc(handler.ToggleApproval)))
+			request := httptest.NewRequest(http.MethodPatch, "/api/v1/reimbursements/"+tt.id+"/approve", nil)
+			if tt.role != "" {
+				_, token := reimbursementTestToken(t, 42, tt.role)
+				request.Header.Set("Authorization", "Bearer "+token)
+			}
+			recorder := httptest.NewRecorder()
+			mux.ServeHTTP(recorder, request)
+			if recorder.Code != tt.wantStatus || service.called != tt.wantCall {
+				t.Fatalf("status = %d, called = %t, body = %s", recorder.Code, service.called, recorder.Body.String())
+			}
+			if tt.wantCall && (service.role != tt.role || service.approvalID != 23) {
+				t.Fatalf("service role = %q, ID = %d", service.role, service.approvalID)
+			}
+			if tt.wantStatus == http.StatusOK {
+				var response Response
+				if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil || response.Status != tt.resultStatus || recorder.Header().Get("Cache-Control") != "no-store" {
+					t.Fatalf("response = %+v, error = %v", response, err)
+				}
+			} else {
+				var response struct {
+					Error struct {
+						Code string `json:"code"`
+					} `json:"error"`
+				}
+				if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil || response.Error.Code != tt.wantCode {
+					t.Fatalf("error response = %+v, error = %v", response, err)
+				}
+			}
+		})
+	}
 }
 
 func (service *stubService) ReceiptURL(context.Context, int64, string, int64) (string, error) {

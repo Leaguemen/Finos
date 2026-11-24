@@ -9,7 +9,7 @@ import { Button } from './ui';
 import { useAuth } from './auth-provider';
 import { bearerHeaders, getTokenRole, SESSION_KEY } from '@/app/lib/auth';
 import { filterAndSort } from '@/app/lib/collection';
-import { apiRequest, displayDate, localToday, type Employee, type TimesheetOption } from '@/app/lib/timesheets';
+import { apiRequest, displayDate, type Employee, type TimesheetOption } from '@/app/lib/timesheets';
 import { displayAmount, isReimbursement, reimbursementRequest, reimbursementStatuses, type Reimbursement } from '@/app/lib/reimbursements';
 
 const sorts = [
@@ -25,6 +25,10 @@ function ReimbursementList() {
   const { session } = useAuth();
   const isManager = getTokenRole(session?.token) === 'manager';
   const [rows, setRows] = useState<Reimbursement[]>([]);
+  const [approving, setApproving] = useState<number[]>([]);
+  const [approvalErrors, setApprovalErrors] = useState<Record<number, string>>({});
+  const [approvalNotice, setApprovalNotice] = useState('');
+  const approvalsInProgress = useRef(new Set<number>());
   const [timesheets, setTimesheets] = useState<TimesheetOption[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,12 +97,34 @@ function ReimbursementList() {
 
   const reset = () => { setSearch(''); setStatus(''); setCategory(''); setTimesheetDescription(''); setUserId(''); setReceipt(''); setFrom(''); setTo(''); setSort('date-desc'); };
 
+  async function approveReimbursement(row: Reimbursement) {
+    if (!isManager || approvalsInProgress.current.has(row.id)) return;
+    approvalsInProgress.current.add(row.id);
+    setApproving(ids => [...ids, row.id]);
+    setApprovalErrors(errors => ({ ...errors, [row.id]: '' }));
+    setApprovalNotice('');
+    try {
+      const updated = await reimbursementRequest<Reimbursement>(`/api/reimbursements/${row.id}/approve`, { method: 'PATCH' });
+      const expectedStatus = row.status === 'approved' ? 'draft' : 'approved';
+      if (!isReimbursement(updated) || updated.id !== row.id || updated.status !== expectedStatus) {
+        throw new Error('The server did not confirm the status change. Please refresh and try again.');
+      }
+      setRows(current => current.map(item => item.id === updated.id ? updated : item));
+      setApprovalNotice(`Reimbursement #${row.id} for ${employeeName(row.user_id)} ${updated.status === 'approved' ? 'approved' : 'returned to draft'}.`);
+    } catch (reason) {
+      setApprovalErrors(errors => ({ ...errors, [row.id]: reason instanceof Error ? reason.message : 'Unable to update this reimbursement. Please try again.' }));
+    } finally {
+      approvalsInProgress.current.delete(row.id);
+      setApproving(ids => ids.filter(id => id !== row.id));
+    }
+  }
+
   async function exportRows() {
     if (exportInProgress.current || loading || error || invalidRange || !filtered.length) return;
     exportInProgress.current = true; setExporting(true); setExportError('');
     try {
       const { downloadReimbursements } = await import('@/app/lib/reimbursement-export');
-      await downloadReimbursements(filtered, localToday(), employeeName, timesheetMap, isManager);
+      await downloadReimbursements(filtered, employeeName, timesheetMap, isManager);
     } catch { setExportError('Unable to export your reimbursements. Please try again.'); }
     finally { exportInProgress.current = false; setExporting(false); }
   }
@@ -127,6 +153,7 @@ function ReimbursementList() {
     </div></div>
     {exportError && <p className="form-error page-message" role="alert">{exportError}</p>}
     {receiptError && <p className="form-error page-message" role="alert">{receiptError}</p>}
+    <p className="approval-notice" role="status">{approvalNotice}</p>
     <section className="timesheet-panel reimbursement-panel" aria-label={isManager ? 'Team reimbursements' : 'Your reimbursements'}>
       <CollectionControls search={search} onSearch={setSearch} sort={sort} onSort={setSort} options={sorts} onReset={reset} searchPlaceholder="Search categories or descriptions…">
         {isManager && <label>Employee<select value={userId} onChange={event => setUserId(event.target.value)}><option value="">All employees</option>{filterEmployees.map(employee => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select></label>}
@@ -140,11 +167,17 @@ function ReimbursementList() {
       {invalidRange && <p className="form-error inline-message" role="alert">The end date must be on or after the start date.</p>}
       {loading ? <div className="list-state" role="status">Loading reimbursements…</div> : error ? <div className="list-state"><p role="alert">{error}</p><Button className="button-secondary" onClick={() => setReload(value => value + 1)}>Try again</Button></div> : <>
         <div className="list-summary"><span>{filtered.length} of {rows.length} reimbursements</span><strong>{displayAmount(filtered.reduce((sum, row) => sum + Number(row.amount), 0).toFixed(2))} total shown</strong></div>
-        {!filtered.length ? <div className="list-state"><BanknotesIcon /><h2>{rows.length ? 'No matching reimbursements.' : 'Your expense ledger is ready.'}</h2><p>{rows.length ? 'Try another search or adjust your filters.' : 'Create a reimbursement and attach a receipt when you have one.'}</p>{rows.length ? <Button className="button-secondary" onClick={reset}>Clear filters</Button> : <Link className="finos-button" href="/reimbursements/new">Create a reimbursement<PlusIcon /></Link>}</div> : <div className="timesheet-table-wrap"><table className="timesheet-table reimbursement-table"><thead><tr><th>Expense date</th>{isManager && <th>Employee</th>}<th>Expense</th><th>Timesheet</th><th className="amount-column">Amount</th><th>Status</th><th>Receipt</th></tr></thead><tbody>{filtered.map(row => {
+        {!filtered.length ? <div className="list-state"><BanknotesIcon /><h2>{rows.length ? 'No matching reimbursements.' : 'Your expense ledger is ready.'}</h2><p>{rows.length ? 'Try another search or adjust your filters.' : 'Create a reimbursement and attach a receipt when you have one.'}</p>{rows.length ? <Button className="button-secondary" onClick={reset}>Clear filters</Button> : <Link className="finos-button" href="/reimbursements/new">Create a reimbursement<PlusIcon /></Link>}</div> : <div className="timesheet-table-wrap"><table className="timesheet-table reimbursement-table"><thead><tr><th>Expense date</th>{isManager && <th>Employee</th>}<th>Expense</th><th>Timesheet</th><th className="amount-column">Amount</th><th>Status</th><th>Receipt</th>{isManager && <th className="approval-column">Approval</th>}</tr></thead><tbody>{filtered.map(row => {
           return <tr key={row.id}><td data-label="Expense date"><time dateTime={row.expense_date}>{displayDate(row.expense_date)}</time></td>{isManager && <td data-label="Employee">{employeeName(row.user_id)}</td>}
             <td data-label="Expense" className="description-cell"><strong className="category-name">{row.category}</strong>{row.description ? <span className="expense-description">{row.description}</span> : <span className="muted expense-description">No description</span>}</td>
             <td data-label="Timesheet" className="timesheet-description-cell">{timesheetDescriptionFor(row.timesheet_id)}</td><td data-label="Amount" className="amount-column">{displayAmount(row.amount)}</td>
-            <td data-label="Status"><span className={`status-pill status-${row.status}`}>{row.status}</span></td><td data-label="Receipt">{row.has_receipt ? <Button className="receipt-button button-secondary" onClick={() => openReceipt(row.id)} disabled={openingReceipt !== null} aria-busy={openingReceipt === row.id}>{openingReceipt === row.id ? 'Opening…' : 'View'}<DocumentTextIcon /></Button> : <span className="muted">None</span>}</td></tr>;
+            <td data-label="Status"><span className={`status-pill status-${row.status}`}>{row.status}</span></td><td data-label="Receipt">{row.has_receipt ? <Button className="receipt-button button-secondary" onClick={() => openReceipt(row.id)} disabled={openingReceipt !== null} aria-busy={openingReceipt === row.id}>{openingReceipt === row.id ? 'Opening…' : 'View'}<DocumentTextIcon /></Button> : <span className="muted">None</span>}</td>
+            {isManager && <td className="approval-column" data-label="Approval"><div className="approval-action">
+              <Button type="button" className="button-secondary" disabled={approving.includes(row.id)}
+                aria-label={`${row.status === 'approved' ? 'Return to draft:' : 'Approve'} reimbursement #${row.id} for ${employeeName(row.user_id)}`} aria-busy={approving.includes(row.id)}
+                onClick={() => approveReimbursement(row)}>{approving.includes(row.id) ? (row.status === 'approved' ? 'Returning to draft…' : 'Approving…') : row.status === 'approved' ? 'Return to draft' : 'Approve'}</Button>
+              {approvalErrors[row.id] && <p className="form-error" role="alert">{approvalErrors[row.id]}</p>}
+            </div></td>}</tr>;
         })}</tbody></table></div>}
       </>}
     </section>

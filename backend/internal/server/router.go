@@ -68,6 +68,10 @@ func New(
 		authenticate(http.HandlerFunc(reimbursementHandler.Get)),
 	)
 	mux.Handle(
+		"PATCH /api/v1/reimbursements/{reimbursementID}/approve",
+		authenticate(http.HandlerFunc(reimbursementHandler.ToggleApproval)),
+	)
+	mux.Handle(
 		"GET /api/v1/reimbursements/{reimbursementID}/receipt",
 		authenticate(http.HandlerFunc(reimbursementHandler.Receipt)),
 	)

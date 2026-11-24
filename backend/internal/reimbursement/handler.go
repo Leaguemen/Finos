@@ -33,6 +33,7 @@ type ReimbursementService interface {
 	Create(ctx context.Context, userID, timesheetID int64, input CreateInput) (Response, error)
 	ListByTimesheet(ctx context.Context, userID int64, userRole string, timesheetID int64) ([]Response, error)
 	Get(ctx context.Context, userID int64, userRole string, reimbursementID int64) (Response, error)
+	ToggleApproval(ctx context.Context, userRole string, reimbursementID int64) (Response, error)
 	ReceiptURL(ctx context.Context, userID int64, userRole string, reimbursementID int64) (string, error)
 }
 
@@ -181,6 +182,28 @@ func (handler *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeSensitiveJSON(w, http.StatusOK, reimbursement)
+}
+
+func (handler *Handler) ToggleApproval(w http.ResponseWriter, r *http.Request) {
+	principal, ok := auth.PrincipalFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Authentication is required")
+		return
+	}
+	reimbursementID, ok := positivePathID(w, r.PathValue("reimbursementID"), "Reimbursement")
+	if !ok {
+		return
+	}
+	updated, err := handler.service.ToggleApproval(r.Context(), principal.Role, reimbursementID)
+	if err != nil {
+		if errors.Is(err, ErrForbidden) {
+			writeError(w, http.StatusForbidden, "forbidden", "Only managers can approve reimbursements")
+			return
+		}
+		handler.writeServiceError(w, "toggle reimbursement approval", err)
+		return
+	}
+	writeSensitiveJSON(w, http.StatusOK, updated)
 }
 
 func (handler *Handler) Receipt(w http.ResponseWriter, r *http.Request) {

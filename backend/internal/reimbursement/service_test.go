@@ -18,6 +18,8 @@ type stubRepository struct {
 	createParams     CreateParams
 	createCalled     bool
 	ownershipChecked bool
+	toggleCalled     bool
+	toggledID        int64
 }
 
 func (repository *stubRepository) TimesheetExists(context.Context, int64) (bool, error) {
@@ -41,6 +43,27 @@ func (repository *stubRepository) ListByTimesheet(context.Context, int64) ([]Rei
 
 func (repository *stubRepository) FindByID(context.Context, int64) (Reimbursement, error) {
 	return repository.found, repository.err
+}
+
+func (repository *stubRepository) ToggleApproval(_ context.Context, reimbursementID int64) (Reimbursement, error) {
+	repository.toggleCalled = true
+	repository.toggledID = reimbursementID
+	return repository.found, repository.err
+}
+
+func TestToggleApprovalRequiresManager(t *testing.T) {
+	repository := &stubRepository{found: Reimbursement{ID: 23, Status: StatusApproved}}
+	service := NewService(repository, nil)
+	if _, err := service.ToggleApproval(context.Background(), "employee", 23); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("employee error = %v, want ErrForbidden", err)
+	}
+	if repository.toggleCalled {
+		t.Fatal("repository called for employee")
+	}
+	response, err := service.ToggleApproval(context.Background(), "manager", 23)
+	if err != nil || !repository.toggleCalled || repository.toggledID != 23 || response.Status != StatusApproved {
+		t.Fatalf("manager result = %+v, error = %v, repository = %+v", response, err, repository)
+	}
 }
 
 type stubReceiptStore struct {

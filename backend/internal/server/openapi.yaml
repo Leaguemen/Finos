@@ -412,6 +412,41 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/v1/reimbursements/{reimbursementID}/approve:
+    patch:
+      tags: [Reimbursements]
+      operationId: toggleReimbursementApproval
+      summary: Toggle reimbursement approval
+      description: |
+        Manager-only. Changes a non-approved reimbursement to `approved`; calling it on an
+        approved reimbursement changes its status back to `draft`. The request has no body.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ReimbursementID"
+      responses:
+        "200":
+          description: Updated reimbursement.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reimbursement"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /api/v1/reimbursements/{reimbursementID}/receipt:
     get:
       tags: [Reimbursements]

@@ -7,7 +7,7 @@ import { CollectionControls } from './collection-controls';
 import { Button } from './ui';
 import { useAuth } from './auth-provider';
 import { getTokenRole } from '@/app/lib/auth';
-import { apiRequest, displayDate, localToday, statuses, type Employee, type Timesheet } from '@/app/lib/timesheets';
+import { apiRequest, displayDate, statuses, type Employee, type Timesheet } from '@/app/lib/timesheets';
 import { filterAndSort } from '@/app/lib/collection';
 const sorts = [
   { value: 'date-desc', label: 'Date · newest first' }, { value: 'date-asc', label: 'Date · oldest first' },
@@ -102,7 +102,7 @@ function TimesheetList() {
     try {
       // Load the Excel writer only when the user requests an export.
       const { downloadTimesheets } = await import('@/app/lib/timesheet-export');
-      await downloadTimesheets(filtered, localToday());
+      await downloadTimesheets(filtered);
     } catch {
       setExportError('Unable to export your timesheets. Please try again.');
     } finally {

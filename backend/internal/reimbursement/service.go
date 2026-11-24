@@ -157,6 +157,21 @@ func (service *Service) Get(
 	return toResponse(found), nil
 }
 
+func (service *Service) ToggleApproval(
+	ctx context.Context,
+	userRole string,
+	reimbursementID int64,
+) (Response, error) {
+	if userRole != "manager" {
+		return Response{}, ErrForbidden
+	}
+	updated, err := service.repository.ToggleApproval(ctx, reimbursementID)
+	if err != nil {
+		return Response{}, fmt.Errorf("toggle reimbursement approval: %w", err)
+	}
+	return toResponse(updated), nil
+}
+
 func (service *Service) ReceiptURL(
 	ctx context.Context,
 	userID int64,
