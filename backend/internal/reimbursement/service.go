@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"math/big"
 	"regexp"
 	"strings"
@@ -170,6 +171,35 @@ func (service *Service) ToggleApproval(
 		return Response{}, fmt.Errorf("toggle reimbursement approval: %w", err)
 	}
 	return toResponse(updated), nil
+}
+
+func (service *Service) Delete(ctx context.Context, userID, reimbursementID int64) error {
+	if userID <= 0 {
+		return ErrInvalidUserID
+	}
+	found, err := service.repository.FindByID(ctx, reimbursementID)
+	if err != nil {
+		return fmt.Errorf("find reimbursement for deletion: %w", err)
+	}
+	if found.UserID != userID {
+		return ErrForbidden
+	}
+	deleted, err := service.repository.DeleteOwned(ctx, reimbursementID, userID)
+	if err != nil {
+		return fmt.Errorf("delete reimbursement: %w", err)
+	}
+	if deleted.Receipt != nil {
+		if service.receiptStore == nil {
+			log.Printf("delete reimbursement %d: receipt storage is not configured for cleanup", reimbursementID)
+			return nil
+		}
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		defer cancel()
+		if err := service.receiptStore.Delete(cleanupCtx, *deleted.Receipt); err != nil {
+			log.Printf("delete reimbursement %d: clean up receipt: %v", reimbursementID, err)
+		}
+	}
+	return nil
 }
 
 func (service *Service) ReceiptURL(

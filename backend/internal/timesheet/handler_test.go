@@ -26,6 +26,10 @@ func (creator *stubCreator) ApproveTimesheet(_ context.Context, _ int64, _ strin
 	panic("unexpected ApproveTimesheet call")
 }
 
+func (creator *stubCreator) Delete(context.Context, int64, int64) error {
+	panic("unexpected Delete call")
+}
+
 func (creator *stubCreator) Create(
 	_ context.Context,
 	userID int64,

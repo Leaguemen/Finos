@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
+	"finos.com/api/internal/reimbursement"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -18,14 +20,20 @@ var (
 	ErrInvalidHours      = errors.New("hours_worked must be between 1 and 24")
 	ErrNotManager        = errors.New("You are not a manager, go away")
 	ErrTimesheetNotFound = errors.New("timesheet not found")
+	ErrForbidden         = errors.New("only the timesheet creator can delete it")
 )
 
 type Service struct {
-	repository Repository
+	repository   Repository
+	receiptStore ReceiptCleaner
 }
 
-func NewService(repository Repository) *Service {
-	return &Service{repository: repository}
+type ReceiptCleaner interface {
+	Delete(ctx context.Context, asset reimbursement.ReceiptAsset) error
+}
+
+func NewService(repository Repository, receiptStore ReceiptCleaner) *Service {
+	return &Service{repository: repository, receiptStore: receiptStore}
 }
 
 func (service *Service) Create(
@@ -135,6 +143,41 @@ func (service *Service) ApproveTimesheet(
 		return Response{}, fmt.Errorf("approve timesheet: %w", err)
 	}
 	return toResponse(approvedTimesheet), nil
+}
+
+func (service *Service) Delete(ctx context.Context, userID, timesheetID int64) error {
+	if userID <= 0 {
+		return ErrInvalidUserID
+	}
+	found, err := service.repository.FindByID(ctx, timesheetID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrTimesheetNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("find timesheet for deletion: %w", err)
+	}
+	if found.UserID != userID {
+		return ErrForbidden
+	}
+	assets, err := service.repository.DeleteOwned(ctx, timesheetID, userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrTimesheetNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("delete timesheet: %w", err)
+	}
+	if len(assets) > 0 && service.receiptStore == nil {
+		log.Printf("delete timesheet %d: receipt storage is not configured for cleanup", timesheetID)
+		return nil
+	}
+	for _, asset := range assets {
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		if err := service.receiptStore.Delete(cleanupCtx, asset); err != nil {
+			log.Printf("delete timesheet %d: clean up receipt: %v", timesheetID, err)
+		}
+		cancel()
+	}
+	return nil
 }
 
 func normalizeDescription(description *string) *string {

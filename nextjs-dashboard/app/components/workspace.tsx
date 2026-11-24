@@ -5,9 +5,10 @@ import { PlusIcon, ClockIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outl
 import { WorkspaceShell } from './workspace-shell';
 import { CollectionControls } from './collection-controls';
 import { Button } from './ui';
+import { DeleteConfirmationDialog } from './delete-confirmation-dialog';
 import { useAuth } from './auth-provider';
 import { getTokenRole } from '@/app/lib/auth';
-import { apiRequest, displayDate, statuses, type Employee, type Timesheet } from '@/app/lib/timesheets';
+import { apiDelete, apiRequest, displayDate, statuses, type Employee, type Timesheet } from '@/app/lib/timesheets';
 import { filterAndSort } from '@/app/lib/collection';
 const sorts = [
   { value: 'date-desc', label: 'Date · newest first' }, { value: 'date-asc', label: 'Date · oldest first' },
@@ -21,6 +22,10 @@ function TimesheetList() {
   const [approvalErrors, setApprovalErrors] = useState<Record<number, string>>({});
   const [approvalNotice, setApprovalNotice] = useState('');
   const approvalsInProgress = useRef(new Set<number>());
+  const [deleting, setDeleting] = useState<number[]>([]);
+  const [deleteErrors, setDeleteErrors] = useState<Record<number, string>>({});
+  const [pendingDelete, setPendingDelete] = useState<Timesheet | null>(null);
+  const deletesInProgress = useRef(new Set<number>());
   const [rows, setRows] = useState<Timesheet[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,6 +99,24 @@ function TimesheetList() {
       setApproving(ids => ids.filter(id => id !== row.id));
     }
   }
+  async function deleteTimesheet(row: Timesheet) {
+    if (row.user_id !== session?.user?.id || deletesInProgress.current.has(row.id)) return;
+    deletesInProgress.current.add(row.id);
+    setDeleting(ids => [...ids, row.id]);
+    setDeleteErrors(errors => ({ ...errors, [row.id]: '' }));
+    setApprovalNotice('');
+    try {
+      await apiDelete(`/api/timesheets/${row.id}`);
+      setRows(current => current.filter(item => item.id !== row.id));
+      setPendingDelete(null);
+      setApprovalNotice(`Timesheet #${row.id} deleted.`);
+    } catch (error) {
+      setDeleteErrors(errors => ({ ...errors, [row.id]: error instanceof Error ? error.message : 'Unable to delete this timesheet.' }));
+    } finally {
+      deletesInProgress.current.delete(row.id);
+      setDeleting(ids => ids.filter(id => id !== row.id));
+    }
+  }
   async function exportTimesheets() {
     if (exportInProgress.current || loading || error || invalidRange || !filtered.length) return;
     exportInProgress.current = true;
@@ -111,6 +134,11 @@ function TimesheetList() {
     }
   }
   return <>
+    {pendingDelete && <DeleteConfirmationDialog
+      title={`Delete timesheet #${pendingDelete.id}?`}
+      description="This permanently deletes the timesheet and its linked reimbursements and receipts. You cannot undo this action."
+      busy={deleting.includes(pendingDelete.id)} error={deleteErrors[pendingDelete.id]}
+      onCancel={() => setPendingDelete(null)} onConfirm={() => deleteTimesheet(pendingDelete)} />}
     <p className="eyebrow"><span />YOUR WORKSPACE</p>
     <div className="workspace-title"><div><h1>{isManager ? 'Team timesheets.' : 'My timesheets.'}</h1><p>{isManager ? 'Review your team’s work and approve their timesheets.' : 'A little record of the work that moves you forward.'}</p></div><div className="workspace-actions">
       <Button type="button" className="button-secondary" onClick={exportTimesheets}
@@ -132,7 +160,7 @@ function TimesheetList() {
       {invalidRange && <p className="form-error" role="alert">The end date must be on or after the start date.</p>}
       {loading ? <div className="list-state" role="status">Loading your timesheets…</div> : error ? <div className="list-state"><p role="alert">{error}</p><Button className="button-secondary" onClick={() => setReload(n => n + 1)}>Try again</Button></div> : <>
         <div className="list-summary" role="status"><span>{filtered.length} of {rows.length} timesheets</span><strong>{filtered.reduce((sum, row) => sum + row.hours_worked, 0)} hours shown</strong></div>
-        {filtered.length === 0 ? <div className="list-state"><ClockIcon /><h2>{rows.length ? 'No matching timesheets.' : isManager ? 'No team timesheets yet.' : 'Your first entry starts here.'}</h2><p>{rows.length ? 'Try another search or adjust your filters.' : 'Keep track of your working day, one timesheet at a time.'}</p>{rows.length ? <Button className="button-secondary" onClick={reset}>Clear filters</Button> : <Link className="finos-button" href="/timesheets/new">Create a timesheet<PlusIcon /></Link>}</div> : <div className="timesheet-table-wrap"><table className="timesheet-table"><thead><tr><th>Work date</th>{isManager && <th>Employee</th>}<th>Description</th><th>Hours</th><th>Status</th>{isManager && <th className="approval-column">Approval</th>}</tr></thead><tbody>{filtered.map(row => <tr key={row.id}>
+        {filtered.length === 0 ? <div className="list-state"><ClockIcon /><h2>{rows.length ? 'No matching timesheets.' : isManager ? 'No team timesheets yet.' : 'Your first entry starts here.'}</h2><p>{rows.length ? 'Try another search or adjust your filters.' : 'Keep track of your working day, one timesheet at a time.'}</p>{rows.length ? <Button className="button-secondary" onClick={reset}>Clear filters</Button> : <Link className="finos-button" href="/timesheets/new">Create a timesheet<PlusIcon /></Link>}</div> : <div className="timesheet-table-wrap"><table className="timesheet-table"><thead><tr><th>Work date</th>{isManager && <th>Employee</th>}<th>Description</th><th>Hours</th><th>Status</th>{isManager && <th className="approval-column">Approval</th>}<th>Delete</th></tr></thead><tbody>{filtered.map(row => <tr key={row.id}>
           <td data-label="Work date"><time dateTime={row.work_date}>{displayDate(row.work_date)}</time></td>
           {isManager && <td data-label="Employee">{employeeName(row.user_id)}</td>}
           <td data-label="Description" className="description-cell">{row.description || <span className="muted">No description</span>}</td>
@@ -143,6 +171,7 @@ function TimesheetList() {
               onClick={() => approveTimesheet(row)}>{approving.includes(row.id) ? (row.status === 'approved' ? 'Returning to draft…' : 'Approving…') : row.status === 'approved' ? 'Return to draft' : 'Approve'}</Button>
             {approvalErrors[row.id] && <p className="form-error" role="alert">{approvalErrors[row.id]}</p>}
           </div></td>}
+          <td data-label="Delete">{row.user_id === session?.user?.id && <Button type="button" className="button-secondary delete-button" disabled={deleting.includes(row.id)} aria-busy={deleting.includes(row.id)} aria-label={`Delete timesheet #${row.id}`} onClick={() => { setDeleteErrors(errors => ({ ...errors, [row.id]: '' })); setPendingDelete(row); }}>{deleting.includes(row.id) ? 'Deleting…' : 'Delete'}</Button>}</td>
         </tr>)}</tbody></table></div>}
       </>}
     </section>

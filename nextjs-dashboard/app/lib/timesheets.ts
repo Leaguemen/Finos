@@ -21,6 +21,17 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
   if (!body) throw new Error('The server returned an invalid response. Please try again.');
   return body;
 }
+export async function apiDelete(path: string): Promise<void> {
+  const response = await fetch(path, { method: 'DELETE', headers: bearerHeaders(), cache: 'no-store', signal: AbortSignal.timeout(20_000) });
+  if (response.status === 401) {
+    localStorage.removeItem(SESSION_KEY);
+    window.dispatchEvent(new Event('storage'));
+    throw new Error('Your session has expired. Please log in again.');
+  }
+  if (response.status === 204) return;
+  const body = await response.json().catch(() => null);
+  throw new Error(body?.error?.message || 'Unable to delete this record. Please try again.');
+}
 export function displayDate(date: string) {
   return new Date(`${date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }

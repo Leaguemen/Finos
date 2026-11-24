@@ -74,6 +74,19 @@ form .finos-button { width: 100%; margin-top: 29px; }
 .workspace-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; background: white; border-bottom: 1px solid var(--line); }
 .button-secondary { min-height: 44px; border-color: var(--line); background: white; font-size: 12px; padding: 10px 14px; }
 .button-secondary:hover:not(:disabled) { background: var(--canvas); }
+.finos-button.delete-button { color: #a52626; }
+.delete-dialog { width: min(440px, calc(100% - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink); box-shadow: 0 22px 70px #151a1e33; }
+.delete-dialog::backdrop { background: #151a1e99; }
+.delete-dialog-content { padding: 30px; }
+.delete-dialog-icon { width: 46px; height: 46px; display: grid; place-items: center; margin-bottom: 22px; border-radius: 10px; background: #fff0eb; color: #9b3021; }
+.delete-dialog-icon svg { width: 25px; height: 25px; }
+.delete-dialog h2 { font-size: 23px; font-weight: 700; letter-spacing: -.7px; line-height: 1.2; }
+.delete-dialog-content > p:not(.form-error) { margin-top: 12px; color: var(--muted); font-size: 14px; line-height: 1.7; }
+.delete-dialog .form-error { margin-top: 18px; }
+.delete-dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 28px; }
+.delete-dialog-actions .finos-button { min-height: 44px; justify-content: center; }
+.delete-dialog-confirm { background: #a52626; color: white; }
+.delete-dialog-confirm:hover:not(:disabled) { background: #8c1f1f; }
 .workspace-main { width: 100%; max-width: 1080px; margin: 0 auto; padding: 42px 24px; flex: 1; }
 .workspace-title { display: flex; align-items: flex-start; flex-direction: column; flex-wrap: wrap; gap: 22px; margin: 15px 0 30px; }
 .workspace-actions { display: flex; flex-wrap: wrap; gap: 12px; }

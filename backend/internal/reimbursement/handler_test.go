@@ -29,6 +29,7 @@ type stubService struct {
 	err         error
 	role        string
 	approvalID  int64
+	deleteID    int64
 }
 
 func (service *stubService) Create(
@@ -57,6 +58,13 @@ func (service *stubService) ToggleApproval(_ context.Context, role string, reimb
 	service.role = role
 	service.approvalID = reimbursementID
 	return service.result, service.err
+}
+
+func (service *stubService) Delete(_ context.Context, userID, reimbursementID int64) error {
+	service.called = true
+	service.userID = userID
+	service.deleteID = reimbursementID
+	return service.err
 }
 
 func TestToggleReimbursementApproval(t *testing.T) {

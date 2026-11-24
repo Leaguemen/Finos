@@ -56,6 +56,10 @@ func New(
 		authenticate(http.HandlerFunc(timesheetHandler.ApproveTimesheet)),
 	)
 	mux.Handle(
+		"DELETE /api/v1/timesheets/{timesheetID}",
+		authenticate(http.HandlerFunc(timesheetHandler.Delete)),
+	)
+	mux.Handle(
 		"POST /api/v1/timesheets/{timesheetID}/reimbursements",
 		authenticate(http.HandlerFunc(reimbursementHandler.Create)),
 	)
@@ -66,6 +70,10 @@ func New(
 	mux.Handle(
 		"GET /api/v1/reimbursements/{reimbursementID}",
 		authenticate(http.HandlerFunc(reimbursementHandler.Get)),
+	)
+	mux.Handle(
+		"DELETE /api/v1/reimbursements/{reimbursementID}",
+		authenticate(http.HandlerFunc(reimbursementHandler.Delete)),
 	)
 	mux.Handle(
 		"PATCH /api/v1/reimbursements/{reimbursementID}/approve",

@@ -47,8 +47,6 @@ func main() {
 	userService := user.NewService(userRepository)
 	userHandler := user.NewHandler(userService, tokenManager)
 	timesheetRepository := timesheet.NewRepository(databasePool)
-	timesheetService := timesheet.NewService(timesheetRepository)
-	timesheetHandler := timesheet.NewHandler(timesheetService)
 	reimbursementRepository := reimbursement.NewRepository(databasePool)
 	receiptStore, err := reimbursement.NewCloudinaryStore(
 		cfg.CloudinaryCloudName,
@@ -59,6 +57,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure receipt storage: %v", err)
 	}
+	timesheetService := timesheet.NewService(timesheetRepository, receiptStore)
+	timesheetHandler := timesheet.NewHandler(timesheetService)
 	reimbursementService := reimbursement.NewService(reimbursementRepository, receiptStore)
 	reimbursementHandler := reimbursement.NewHandler(reimbursementService)
 

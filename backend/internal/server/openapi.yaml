@@ -296,6 +296,33 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/v1/timesheets/{timesheetID}:
+    delete:
+      tags: [Timesheets]
+      operationId: deleteTimesheet
+      summary: Delete a timesheet
+      description: |
+        Only the user who created the timesheet may delete it, regardless of role.
+        Its reimbursements are deleted by database cascade, and their receipt assets
+        have their receipt assets cleaned up on a best-effort basis. The request has no body.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TimesheetID"
+      responses:
+        "204":
+          description: Timesheet deleted. No response body.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /api/v1/timesheets/{timesheetID}/reimbursements:
     post:
       tags: [Reimbursements]
@@ -401,6 +428,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Reimbursement"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      tags: [Reimbursements]
+      operationId: deleteReimbursement
+      summary: Delete a reimbursement
+      description: |
+        Only the user who created the reimbursement may delete it, regardless of role.
+        Its receipt asset is cleaned up on a best-effort basis. The request has no body.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ReimbursementID"
+      responses:
+        "204":
+          description: Reimbursement deleted. No response body.
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -849,7 +900,7 @@ components:
               code: unauthorized
               message: A valid bearer token is required
     Forbidden:
-      description: The authenticated user does not have the required manager role.
+      description: The authenticated user is not permitted to perform this operation.
       content:
         application/json:
           schema:
@@ -857,7 +908,7 @@ components:
           example:
             error:
               code: forbidden
-              message: Manager access is required
+              message: Access is forbidden
     NotFound:
       description: The requested resource was not found.
       content:

@@ -6,10 +6,11 @@ import { ArrowDownTrayIcon, BanknotesIcon, DocumentTextIcon, PlusIcon } from '@h
 import { WorkspaceShell } from './workspace-shell';
 import { CollectionControls } from './collection-controls';
 import { Button } from './ui';
+import { DeleteConfirmationDialog } from './delete-confirmation-dialog';
 import { useAuth } from './auth-provider';
 import { bearerHeaders, getTokenRole, SESSION_KEY } from '@/app/lib/auth';
 import { filterAndSort } from '@/app/lib/collection';
-import { apiRequest, displayDate, type Employee, type TimesheetOption } from '@/app/lib/timesheets';
+import { apiDelete, apiRequest, displayDate, type Employee, type TimesheetOption } from '@/app/lib/timesheets';
 import { displayAmount, isReimbursement, reimbursementRequest, reimbursementStatuses, type Reimbursement } from '@/app/lib/reimbursements';
 
 const sorts = [
@@ -29,6 +30,10 @@ function ReimbursementList() {
   const [approvalErrors, setApprovalErrors] = useState<Record<number, string>>({});
   const [approvalNotice, setApprovalNotice] = useState('');
   const approvalsInProgress = useRef(new Set<number>());
+  const [deleting, setDeleting] = useState<number[]>([]);
+  const [deleteErrors, setDeleteErrors] = useState<Record<number, string>>({});
+  const [pendingDelete, setPendingDelete] = useState<Reimbursement | null>(null);
+  const deletesInProgress = useRef(new Set<number>());
   const [timesheets, setTimesheets] = useState<TimesheetOption[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,6 +124,25 @@ function ReimbursementList() {
     }
   }
 
+  async function deleteReimbursement(row: Reimbursement) {
+    if (row.user_id !== session?.user?.id || deletesInProgress.current.has(row.id)) return;
+    deletesInProgress.current.add(row.id);
+    setDeleting(ids => [...ids, row.id]);
+    setDeleteErrors(errors => ({ ...errors, [row.id]: '' }));
+    setApprovalNotice('');
+    try {
+      await apiDelete(`/api/reimbursements/${row.id}`);
+      setRows(current => current.filter(item => item.id !== row.id));
+      setPendingDelete(null);
+      setApprovalNotice(`Reimbursement #${row.id} deleted.`);
+    } catch (reason) {
+      setDeleteErrors(errors => ({ ...errors, [row.id]: reason instanceof Error ? reason.message : 'Unable to delete this reimbursement.' }));
+    } finally {
+      deletesInProgress.current.delete(row.id);
+      setDeleting(ids => ids.filter(id => id !== row.id));
+    }
+  }
+
   async function exportRows() {
     if (exportInProgress.current || loading || error || invalidRange || !filtered.length) return;
     exportInProgress.current = true; setExporting(true); setExportError('');
@@ -146,6 +170,11 @@ function ReimbursementList() {
   }
 
   return <>
+    {pendingDelete && <DeleteConfirmationDialog
+      title={`Delete reimbursement #${pendingDelete.id}?`}
+      description="This permanently deletes the reimbursement and its receipt. You cannot undo this action."
+      busy={deleting.includes(pendingDelete.id)} error={deleteErrors[pendingDelete.id]}
+      onCancel={() => setPendingDelete(null)} onConfirm={() => deleteReimbursement(pendingDelete)} />}
     <p className="eyebrow"><span />YOUR WORKSPACE</p>
     <div className="workspace-title"><div><h1>{isManager ? 'Team reimbursements.' : 'My reimbursements.'}</h1><p>{isManager ? 'A clear ledger of your team’s work expenses.' : 'Your work expenses, receipts, and status in one place.'}</p></div><div className="workspace-actions">
       <Button type="button" className="button-secondary" onClick={exportRows} disabled={loading || !!error || invalidRange || !filtered.length || exporting} aria-busy={exporting} title="Export reimbursements matching the current filters">{exporting ? 'Exporting…' : 'Export to Excel'}<ArrowDownTrayIcon aria-hidden="true" /></Button>
@@ -167,7 +196,7 @@ function ReimbursementList() {
       {invalidRange && <p className="form-error inline-message" role="alert">The end date must be on or after the start date.</p>}
       {loading ? <div className="list-state" role="status">Loading reimbursements…</div> : error ? <div className="list-state"><p role="alert">{error}</p><Button className="button-secondary" onClick={() => setReload(value => value + 1)}>Try again</Button></div> : <>
         <div className="list-summary"><span>{filtered.length} of {rows.length} reimbursements</span><strong>{displayAmount(filtered.reduce((sum, row) => sum + Number(row.amount), 0).toFixed(2))} total shown</strong></div>
-        {!filtered.length ? <div className="list-state"><BanknotesIcon /><h2>{rows.length ? 'No matching reimbursements.' : 'Your expense ledger is ready.'}</h2><p>{rows.length ? 'Try another search or adjust your filters.' : 'Create a reimbursement and attach a receipt when you have one.'}</p>{rows.length ? <Button className="button-secondary" onClick={reset}>Clear filters</Button> : <Link className="finos-button" href="/reimbursements/new">Create a reimbursement<PlusIcon /></Link>}</div> : <div className="timesheet-table-wrap"><table className="timesheet-table reimbursement-table"><thead><tr><th>Expense date</th>{isManager && <th>Employee</th>}<th>Expense</th><th>Timesheet</th><th className="amount-column">Amount</th><th>Status</th><th>Receipt</th>{isManager && <th className="approval-column">Approval</th>}</tr></thead><tbody>{filtered.map(row => {
+        {!filtered.length ? <div className="list-state"><BanknotesIcon /><h2>{rows.length ? 'No matching reimbursements.' : 'Your expense ledger is ready.'}</h2><p>{rows.length ? 'Try another search or adjust your filters.' : 'Create a reimbursement and attach a receipt when you have one.'}</p>{rows.length ? <Button className="button-secondary" onClick={reset}>Clear filters</Button> : <Link className="finos-button" href="/reimbursements/new">Create a reimbursement<PlusIcon /></Link>}</div> : <div className="timesheet-table-wrap"><table className="timesheet-table reimbursement-table"><thead><tr><th>Expense date</th>{isManager && <th>Employee</th>}<th>Expense</th><th>Timesheet</th><th className="amount-column">Amount</th><th>Status</th><th>Receipt</th>{isManager && <th className="approval-column">Approval</th>}<th>Delete</th></tr></thead><tbody>{filtered.map(row => {
           return <tr key={row.id}><td data-label="Expense date"><time dateTime={row.expense_date}>{displayDate(row.expense_date)}</time></td>{isManager && <td data-label="Employee">{employeeName(row.user_id)}</td>}
             <td data-label="Expense" className="description-cell"><strong className="category-name">{row.category}</strong>{row.description ? <span className="expense-description">{row.description}</span> : <span className="muted expense-description">No description</span>}</td>
             <td data-label="Timesheet" className="timesheet-description-cell">{timesheetDescriptionFor(row.timesheet_id)}</td><td data-label="Amount" className="amount-column">{displayAmount(row.amount)}</td>
@@ -177,7 +206,8 @@ function ReimbursementList() {
                 aria-label={`${row.status === 'approved' ? 'Return to draft:' : 'Approve'} reimbursement #${row.id} for ${employeeName(row.user_id)}`} aria-busy={approving.includes(row.id)}
                 onClick={() => approveReimbursement(row)}>{approving.includes(row.id) ? (row.status === 'approved' ? 'Returning to draft…' : 'Approving…') : row.status === 'approved' ? 'Return to draft' : 'Approve'}</Button>
               {approvalErrors[row.id] && <p className="form-error" role="alert">{approvalErrors[row.id]}</p>}
-            </div></td>}</tr>;
+            </div></td>}
+            <td data-label="Delete">{row.user_id === session?.user?.id && <Button type="button" className="button-secondary delete-button" disabled={deleting.includes(row.id)} aria-busy={deleting.includes(row.id)} aria-label={`Delete reimbursement #${row.id}`} onClick={() => { setDeleteErrors(errors => ({ ...errors, [row.id]: '' })); setPendingDelete(row); }}>{deleting.includes(row.id) ? 'Deleting…' : 'Delete'}</Button>}</td></tr>;
         })}</tbody></table></div>}
       </>}
     </section>

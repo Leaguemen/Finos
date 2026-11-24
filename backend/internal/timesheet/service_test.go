@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"finos.com/api/internal/reimbursement"
 )
 
 type stubRepository struct {
@@ -17,6 +19,10 @@ type stubRepository struct {
 	listCalled    bool
 	approveCalled bool
 	approvedID    int64
+	deletedID     int64
+	deletedUserID int64
+	deleteCalled  bool
+	assets        []reimbursement.ReceiptAsset
 }
 
 func (repository *stubRepository) Create(
@@ -48,6 +54,48 @@ func (repository *stubRepository) ApproveTimesheet(_ context.Context, timesheetI
 	return repository.result, repository.err
 }
 
+func (repository *stubRepository) FindByID(context.Context, int64) (Timesheet, error) {
+	return repository.result, repository.err
+}
+
+func (repository *stubRepository) DeleteOwned(_ context.Context, timesheetID, userID int64) ([]reimbursement.ReceiptAsset, error) {
+	repository.deleteCalled = true
+	repository.deletedID = timesheetID
+	repository.deletedUserID = userID
+	return repository.assets, repository.err
+}
+
+type stubReceiptCleaner struct {
+	deleted []reimbursement.ReceiptAsset
+}
+
+func (cleaner *stubReceiptCleaner) Delete(_ context.Context, asset reimbursement.ReceiptAsset) error {
+	cleaner.deleted = append(cleaner.deleted, asset)
+	return nil
+}
+
+func TestDeleteTimesheetRequiresCreatorAndCleansCascadedReceipts(t *testing.T) {
+	asset := reimbursement.ReceiptAsset{PublicID: "receipt-1"}
+	repository := &stubRepository{result: Timesheet{ID: 7, UserID: 42}, assets: []reimbursement.ReceiptAsset{asset}}
+	cleaner := &stubReceiptCleaner{}
+	service := NewService(repository, cleaner)
+	if err := service.Delete(context.Background(), 99, 7); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("other user error = %v, want forbidden", err)
+	}
+	if repository.deleteCalled {
+		t.Fatal("deleted another user's timesheet")
+	}
+	if err := service.Delete(context.Background(), 42, 7); err != nil {
+		t.Fatalf("owner delete error = %v", err)
+	}
+	if !repository.deleteCalled || repository.deletedID != 7 || repository.deletedUserID != 42 {
+		t.Fatalf("delete call = %+v", repository)
+	}
+	if len(cleaner.deleted) != 1 || cleaner.deleted[0] != asset {
+		t.Fatalf("cleaned receipts = %+v", cleaner.deleted)
+	}
+}
+
 func TestServiceCreateUsesAuthenticatedUserAndDraftStatus(t *testing.T) {
 	description := "  Worked on API  "
 	createdAt := time.Date(2026, time.October, 3, 4, 0, 0, 0, time.UTC)
@@ -63,7 +111,7 @@ func TestServiceCreateUsesAuthenticatedUserAndDraftStatus(t *testing.T) {
 			UpdatedAt:   createdAt,
 		},
 	}
-	service := NewService(repository)
+	service := NewService(repository, nil)
 
 	response, err := service.Create(context.Background(), 42, CreateInput{
 		WorkDate:    "2026-10-03",
@@ -124,7 +172,7 @@ func TestServiceCreateValidatesInput(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			repository := &stubRepository{}
-			service := NewService(repository)
+			service := NewService(repository, nil)
 
 			_, err := service.Create(context.Background(), test.userID, test.input)
 			if !errors.Is(err, test.want) {
@@ -149,7 +197,7 @@ func TestServiceGetAllFiltersByAuthenticatedUser(t *testing.T) {
 			},
 		},
 	}
-	service := NewService(repository)
+	service := NewService(repository, nil)
 
 	responses, err := service.GetAll(context.Background(), 42, "employee")
 	if err != nil {
@@ -165,7 +213,7 @@ func TestServiceGetAllFiltersByAuthenticatedUser(t *testing.T) {
 
 func TestServiceGetAllReturnsEmptyArray(t *testing.T) {
 	repository := &stubRepository{listResult: nil}
-	service := NewService(repository)
+	service := NewService(repository, nil)
 
 	responses, err := service.GetAll(context.Background(), 42, "employee")
 	if err != nil {
@@ -181,7 +229,7 @@ func TestServiceGetOptionsEmployeeUsesAuthenticatedUser(t *testing.T) {
 	repository := &stubRepository{
 		listResult: []Timesheet{{ID: 7, UserID: 42, Description: &description}},
 	}
-	service := NewService(repository)
+	service := NewService(repository, nil)
 
 	options, err := service.GetOptions(context.Background(), 42, "employee")
 	if err != nil {
@@ -200,7 +248,7 @@ func TestServiceGetOptionsManagerGetsAllTimesheets(t *testing.T) {
 	repository := &stubRepository{
 		listResult: []Timesheet{{ID: 7, UserID: 99, Description: &description}},
 	}
-	service := NewService(repository)
+	service := NewService(repository, nil)
 
 	options, err := service.GetOptions(context.Background(), 42, "manager")
 	if err != nil {
@@ -216,7 +264,7 @@ func TestServiceGetOptionsManagerGetsAllTimesheets(t *testing.T) {
 
 func TestServiceGetOptionsReturnsEmptyArray(t *testing.T) {
 	repository := &stubRepository{listResult: nil}
-	service := NewService(repository)
+	service := NewService(repository, nil)
 
 	options, err := service.GetOptions(context.Background(), 42, "employee")
 	if err != nil {

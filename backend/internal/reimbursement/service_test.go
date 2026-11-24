@@ -18,6 +18,9 @@ type stubRepository struct {
 	createParams     CreateParams
 	createCalled     bool
 	ownershipChecked bool
+	deleteCalled     bool
+	deletedID        int64
+	deletedUserID    int64
 	toggleCalled     bool
 	toggledID        int64
 }
@@ -49,6 +52,32 @@ func (repository *stubRepository) ToggleApproval(_ context.Context, reimbursemen
 	repository.toggleCalled = true
 	repository.toggledID = reimbursementID
 	return repository.found, repository.err
+}
+
+func (repository *stubRepository) DeleteOwned(_ context.Context, reimbursementID, userID int64) (Reimbursement, error) {
+	repository.deleteCalled = true
+	repository.deletedID = reimbursementID
+	repository.deletedUserID = userID
+	return repository.found, repository.err
+}
+
+func TestDeleteReimbursementRequiresCreatorAndCleansReceipt(t *testing.T) {
+	asset := ReceiptAsset{PublicID: "receipt-1"}
+	repository := &stubRepository{found: Reimbursement{ID: 23, UserID: 42, Receipt: &asset}}
+	store := &stubReceiptStore{}
+	service := NewService(repository, store)
+	if err := service.Delete(context.Background(), 99, 23); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("other user error = %v, want forbidden", err)
+	}
+	if repository.deleteCalled || store.deleteCalled {
+		t.Fatal("deleted another user's reimbursement or receipt")
+	}
+	if err := service.Delete(context.Background(), 42, 23); err != nil {
+		t.Fatalf("owner delete error = %v", err)
+	}
+	if !repository.deleteCalled || repository.deletedID != 23 || repository.deletedUserID != 42 || !store.deleteCalled {
+		t.Fatalf("delete call = %+v, receipt cleaned = %t", repository, store.deleteCalled)
+	}
 }
 
 func TestToggleApprovalRequiresManager(t *testing.T) {

@@ -21,6 +21,7 @@ type TimesheetService interface {
 	GetAll(ctx context.Context, userID int64, userRole string) ([]Response, error)
 	GetOptions(ctx context.Context, userID int64, userRole string) ([]Option, error)
 	ApproveTimesheet(ctx context.Context, timesheetID int64, userRole string) (Response, error)
+	Delete(ctx context.Context, userID, timesheetID int64) error
 }
 
 type Handler struct {
@@ -160,6 +161,34 @@ func (handler *Handler) ApproveTimesheet(w http.ResponseWriter, r *http.Request)
 	}
 
 	helper.WriteJSON(w, http.StatusOK, timesheet)
+}
+
+func (handler *Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	principal, ok := auth.PrincipalFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Authentication is required")
+		return
+	}
+	timesheetID, err := strconv.ParseInt(r.PathValue("timesheetID"), 10, 64)
+	if err != nil || timesheetID <= 0 {
+		writeError(w, http.StatusBadRequest, "validation_error", "Timesheet ID must be a positive integer")
+		return
+	}
+	if err := handler.service.Delete(r.Context(), principal.UserID, timesheetID); err != nil {
+		switch {
+		case errors.Is(err, ErrInvalidUserID):
+			writeError(w, http.StatusUnauthorized, "unauthorized", "Authentication is required")
+		case errors.Is(err, ErrForbidden):
+			writeError(w, http.StatusForbidden, "forbidden", "Only the timesheet creator can delete it")
+		case errors.Is(err, ErrTimesheetNotFound):
+			writeError(w, http.StatusNotFound, "not_found", "Timesheet not found")
+		default:
+			log.Printf("delete timesheet: %v", err)
+			writeError(w, http.StatusInternalServerError, "internal_error", "Internal server error")
+		}
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func writeError(w http.ResponseWriter, status int, code, message string) {

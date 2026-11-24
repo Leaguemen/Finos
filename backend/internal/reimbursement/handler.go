@@ -34,6 +34,7 @@ type ReimbursementService interface {
 	ListByTimesheet(ctx context.Context, userID int64, userRole string, timesheetID int64) ([]Response, error)
 	Get(ctx context.Context, userID int64, userRole string, reimbursementID int64) (Response, error)
 	ToggleApproval(ctx context.Context, userRole string, reimbursementID int64) (Response, error)
+	Delete(ctx context.Context, userID, reimbursementID int64) error
 	ReceiptURL(ctx context.Context, userID int64, userRole string, reimbursementID int64) (string, error)
 }
 
@@ -204,6 +205,27 @@ func (handler *Handler) ToggleApproval(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeSensitiveJSON(w, http.StatusOK, updated)
+}
+
+func (handler *Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	principal, ok := auth.PrincipalFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Authentication is required")
+		return
+	}
+	reimbursementID, ok := positivePathID(w, r.PathValue("reimbursementID"), "Reimbursement")
+	if !ok {
+		return
+	}
+	if err := handler.service.Delete(r.Context(), principal.UserID, reimbursementID); err != nil {
+		if errors.Is(err, ErrForbidden) {
+			writeError(w, http.StatusForbidden, "forbidden", "Only the reimbursement creator can delete it")
+			return
+		}
+		handler.writeServiceError(w, "delete reimbursement", err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (handler *Handler) Receipt(w http.ResponseWriter, r *http.Request) {

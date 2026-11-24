@@ -18,6 +18,7 @@ type Repository interface {
 	ListByTimesheet(ctx context.Context, timesheetID int64) ([]Reimbursement, error)
 	FindByID(ctx context.Context, reimbursementID int64) (Reimbursement, error)
 	ToggleApproval(ctx context.Context, reimbursementID int64) (Reimbursement, error)
+	DeleteOwned(ctx context.Context, reimbursementID, userID int64) (Reimbursement, error)
 }
 
 func (repository *PostgresRepository) TimesheetExists(
@@ -204,6 +205,23 @@ func (repository *PostgresRepository) ToggleApproval(
 		return Reimbursement{}, fmt.Errorf("toggle reimbursement approval: %w", err)
 	}
 	return updated, nil
+}
+
+func (repository *PostgresRepository) DeleteOwned(ctx context.Context, reimbursementID, userID int64) (Reimbursement, error) {
+	const query = `
+		DELETE FROM reimbursements WHERE id = $1 AND user_id = $2
+		RETURNING id, user_id, timesheet_id, expense_date, amount::text, category,
+		          description, receipt_public_id, receipt_asset_id, receipt_format,
+		          receipt_resource_type, receipt_delivery_type, status, created_at, updated_at
+	`
+	deleted, err := scanReimbursement(repository.database.QueryRow(ctx, query, reimbursementID, userID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Reimbursement{}, ErrNotFound
+	}
+	if err != nil {
+		return Reimbursement{}, fmt.Errorf("delete reimbursement: %w", err)
+	}
+	return deleted, nil
 }
 
 type rowScanner interface {

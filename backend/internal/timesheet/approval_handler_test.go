@@ -48,7 +48,7 @@ func TestApproveTimesheet(t *testing.T) {
 				result: Timesheet{ID: 7, UserID: 42, Status: tt.resultStatus},
 				err:    tt.repoErr,
 			}
-			handler := NewHandler(NewService(repository))
+			handler := NewHandler(NewService(repository, nil))
 			mux := http.NewServeMux()
 			mux.Handle("PATCH /api/v1/timesheets/{timesheetID}/approve",
 				auth.Authenticate(tokenManager)(http.HandlerFunc(handler.ApproveTimesheet)))
