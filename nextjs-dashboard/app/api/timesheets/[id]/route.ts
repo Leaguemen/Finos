@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { deleteUpstreamResponse } from '@/app/lib/delete-upstream-response';
 
 export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const headers = { 'Cache-Control': 'no-store' };
@@ -12,9 +13,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
       method: 'DELETE', headers: { Authorization: authorization },
       cache: 'no-store', signal: AbortSignal.timeout(15_000),
     });
-    if (upstream.status === 204) return new NextResponse(null, { status: 204, headers });
-    const body = await upstream.json().catch(() => null);
-    return NextResponse.json(body ?? { error: { message: 'The server returned an invalid response.' } }, { status: body ? upstream.status : 502, headers });
+    return deleteUpstreamResponse(upstream, 'timesheet');
   } catch {
     return NextResponse.json({ error: { message: 'We could not reach Finos. Please try again in a moment.' } }, { status: 503, headers });
   }
